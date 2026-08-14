@@ -1,24 +1,19 @@
-// Política de integridad referencial (Etapa 2).
+// Política de integridad referencial.
 //
-// Decisión de diseño: BLOQUEAR el borrado de una persona si tiene vínculos
-// registrados, en vez de borrar en cascada. Es la opción más segura para
-// un archivo genealógico: nunca se pierde información de vínculos por
-// accidente al borrar una persona.
-//
-// Este archivo NO es "use server" porque no expone server actions (recibe
-// el cliente de Supabase como parámetro); lo importan los archivos que sí
-// lo son, como personas-actions.ts.
-//
-// Arquitectura preparada para Documentos y Bitácora: cuando esas tablas
-// existan y tengan persona_id, alcanza con agregar una entrada al arreglo
-// `verificacionesVinculoPersona` de abajo. No hace falta tocar
-// personas-actions.ts ni la lógica de eliminarPersona.
+// Bloquea borrar una persona cuando conserva vínculos familiares o documentos,
+// para evitar que una eliminación accidental deje registros o archivos huérfanos.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface VerificacionVinculo {
   etiqueta: string;
   contar: (supabase: SupabaseClient, personaId: string) => Promise<number>;
+}
+
+export interface DependenciasPersona {
+  vinculosFamiliares: number;
+  documentos: number;
+  entradasBitacora: number;
 }
 
 async function contarVinculosFamiliares(
@@ -29,17 +24,39 @@ async function contarVinculosFamiliares(
     .from("relaciones_filiacion")
     .select("id", { count: "exact", head: true })
     .or(`padre_id.eq.${personaId},hijo_id.eq.${personaId}`);
-
   if (errorFiliacion) throw errorFiliacion;
 
   const { count: countConyuge, error: errorConyuge } = await supabase
     .from("relaciones_conyuge")
     .select("id", { count: "exact", head: true })
     .or(`persona1_id.eq.${personaId},persona2_id.eq.${personaId}`);
-
   if (errorConyuge) throw errorConyuge;
 
   return (countFiliacion ?? 0) + (countConyuge ?? 0);
+}
+
+async function contarDocumentos(
+  supabase: SupabaseClient,
+  personaId: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("documento_persona")
+    .select("documento_id", { count: "exact", head: true })
+    .eq("persona_id", personaId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+async function contarEntradasBitacora(
+  supabase: SupabaseClient,
+  personaId: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("bitacora")
+    .select("id", { count: "exact", head: true })
+    .eq("persona_id", personaId);
+  if (error) throw error;
+  return count ?? 0;
 }
 
 export const verificacionesVinculoPersona: VerificacionVinculo[] = [
@@ -47,21 +64,33 @@ export const verificacionesVinculoPersona: VerificacionVinculo[] = [
     etiqueta: "padres, hijos o cónyuges",
     contar: contarVinculosFamiliares,
   },
-  // Próximamente, cuando existan las tablas correspondientes:
-  // { etiqueta: "documentos asociados", contar: contarDocumentos },
-  // { etiqueta: "entradas de bitácora", contar: contarEntradasBitacora },
+  {
+    etiqueta: "documentos asociados",
+    contar: contarDocumentos,
+  },
 ];
 
 export async function personaTieneVinculos(
   supabase: SupabaseClient,
   personaId: string
-): Promise<{ tieneVinculos: boolean; detalle: string[] }> {
+): Promise<{
+  tieneVinculos: boolean;
+  detalle: string[];
+  dependencias: DependenciasPersona;
+}> {
+  const [vinculosFamiliares, documentos, entradasBitacora] = await Promise.all([
+    contarVinculosFamiliares(supabase, personaId),
+    contarDocumentos(supabase, personaId),
+    contarEntradasBitacora(supabase, personaId),
+  ]);
   const detalle: string[] = [];
 
-  for (const verificacion of verificacionesVinculoPersona) {
-    const cantidad = await verificacion.contar(supabase, personaId);
-    if (cantidad > 0) detalle.push(verificacion.etiqueta);
-  }
+  if (vinculosFamiliares > 0) detalle.push("padres, hijos o cónyuges");
+  if (documentos > 0) detalle.push("documentos asociados");
 
-  return { tieneVinculos: detalle.length > 0, detalle };
+  return {
+    tieneVinculos: detalle.length > 0,
+    detalle,
+    dependencias: { vinculosFamiliares, documentos, entradasBitacora },
+  };
 }

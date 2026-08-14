@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { getPersonaFicha } from "@/lib/relaciones";
 import type { ConyugeInput, FiliacionInput } from "@/lib/supabase/types";
 
 // Reglas de negocio de filiación (Etapa 1).
@@ -17,6 +18,10 @@ import type { ConyugeInput, FiliacionInput } from "@/lib/supabase/types";
 // de cónyuge activos entre el mismo par de personas.
 
 const MAX_PADRES_POR_HIJO = 2;
+
+export async function obtenerFichaPersona(personaId: string) {
+  return getPersonaFicha(personaId);
+}
 
 function revalidarVistas() {
   revalidatePath("/archivo");

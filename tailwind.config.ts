@@ -11,21 +11,36 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        lavender: "#D3C5F6",
-        velvet: "#3B2A60",
-        background: "#FBFAFC",
-        ink: "#241A33",
-        muted: "#8A7FA0",
-        border: "#E7E1F3",
+        // Identidad visual Sakura: los valores viven sólo en :root de
+        // globals.css; Tailwind sólo expone sus roles semánticos.
+        sakura: {
+          canvas: "rgb(var(--sakura-canvas) / <alpha-value>)",
+          paper: "rgb(var(--sakura-paper) / <alpha-value>)",
+          petal: "rgb(var(--sakura-petal) / <alpha-value>)",
+          bloom: "rgb(var(--sakura-bloom) / <alpha-value>)",
+          rose: "rgb(var(--sakura-rose) / <alpha-value>)",
+          lavender: "rgb(var(--sakura-lavender) / <alpha-value>)",
+          plum: "rgb(var(--sakura-plum) / <alpha-value>)",
+          ink: "rgb(var(--sakura-ink) / <alpha-value>)",
+          muted: "rgb(var(--sakura-muted) / <alpha-value>)",
+          line: "rgb(var(--sakura-line) / <alpha-value>)",
+          branch: "rgb(var(--sakura-branch) / <alpha-value>)",
+        },
+        lavender: "rgb(var(--sakura-lavender) / <alpha-value>)",
+        velvet: "rgb(var(--sakura-plum) / <alpha-value>)",
+        background: "rgb(var(--sakura-canvas) / <alpha-value>)",
+        ink: "rgb(var(--sakura-ink) / <alpha-value>)",
+        muted: "rgb(var(--sakura-muted) / <alpha-value>)",
+        border: "rgb(var(--sakura-line) / <alpha-value>)",
         genero: {
-          masculino: "#4A7A9D", // celeste oscuro
-          femenino: "#E8998D", // rosa salmón
-          indefinido: "#A3A3A3", // gris
+          masculino: "rgb(var(--sakura-masculino) / <alpha-value>)",
+          femenino: "rgb(var(--sakura-femenino) / <alpha-value>)",
+          indefinido: "rgb(var(--sakura-indefinido) / <alpha-value>)",
         },
         estado: {
-          confirmada: "#5B8C6E",
-          pendiente: "#C9A24B",
-          incompleta: "#B0664F",
+          confirmada: "rgb(var(--sakura-confirmada) / <alpha-value>)",
+          pendiente: "rgb(var(--sakura-pendiente) / <alpha-value>)",
+          incompleta: "rgb(var(--sakura-incompleta) / <alpha-value>)",
         },
       },
       fontFamily: {
@@ -37,7 +52,12 @@ const config: Config = {
         "2xl": "1.5rem",
       },
       boxShadow: {
-        soft: "0 2px 12px -4px rgba(59, 42, 96, 0.12)",
+        soft: "var(--sakura-shadow-soft)",
+        "sakura-panel": "var(--sakura-shadow-panel)",
+        "sakura-card": "var(--sakura-shadow-card)",
+        "sakura-card-hover": "var(--sakura-shadow-card-hover)",
+        "sakura-float": "var(--sakura-shadow-float)",
+        "sakura-drawer": "var(--sakura-shadow-drawer)",
       },
     },
   },

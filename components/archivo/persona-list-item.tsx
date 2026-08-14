@@ -1,77 +1,12 @@
-"use client";
-
-import { useState, useTransition } from "react";
-import Link from "next/link";
-import { Pencil, Trash2 } from "lucide-react";
-import { eliminarPersona } from "@/lib/personas-actions";
-import { NivelInformacionBadge } from "./nivel-informacion-badge";
+import { CalendarDays, MapPin } from "lucide-react";
 import type { PersonaConNivel } from "@/lib/supabase/types";
 
-interface PersonaListItemProps {
-  persona: PersonaConNivel;
-  onEditar: (persona: PersonaConNivel) => void;
-}
+interface PersonaListItemProps { persona: PersonaConNivel; onAbrir: (personaId: string) => void; }
 
-export function PersonaListItem({ persona, onEditar }: PersonaListItemProps) {
-  const [confirmando, setConfirmando] = useState(false);
-  const [pendiente, startTransition] = useTransition();
+export function PersonaListItem({ persona, onAbrir }: PersonaListItemProps) {
+  const acentoGenero = { masculino: "bg-genero-masculino", femenino: "bg-genero-femenino", no_definido: "bg-genero-indefinido" }[persona.genero];
+  const fechas = [persona.fecha_nacimiento?.slice(0, 4), persona.fecha_fallecimiento?.slice(0, 4)].filter(Boolean);
+  const lugar = persona.lugar_nacimiento ?? persona.lugar_fallecimiento;
 
-  function handleEliminar() {
-    startTransition(async () => {
-      const resultado = await eliminarPersona(persona.id);
-      if (resultado.error) {
-        window.alert(resultado.error);
-        setConfirmando(false);
-      }
-    });
-  }
-
-  return (
-    <li className="flex items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-3 shadow-soft">
-      <div className="flex items-center gap-2 min-w-0">
-        <Link href={`/archivo/${persona.id}`} className="text-sm text-ink truncate hover:text-velvet hover:underline">
-          {persona.nombre} {persona.apellido}
-        </Link>
-        <NivelInformacionBadge nivel={persona.nivel_informacion} />
-      </div>
-
-      <div className="flex items-center gap-1 shrink-0">
-        {confirmando ? (
-          <>
-            <button
-              onClick={handleEliminar}
-              disabled={pendiente}
-              className="text-xs rounded-lg px-2 py-1 text-white bg-estado-incompleta hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {pendiente ? "..." : "Confirmar"}
-            </button>
-            <button
-              onClick={() => setConfirmando(false)}
-              disabled={pendiente}
-              className="text-xs rounded-lg px-2 py-1 text-ink/60 hover:text-ink transition-colors"
-            >
-              Cancelar
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => onEditar(persona)}
-              aria-label="Editar"
-              className="text-ink/40 hover:text-velvet transition-colors p-1"
-            >
-              <Pencil size={16} />
-            </button>
-            <button
-              onClick={() => setConfirmando(true)}
-              aria-label="Eliminar"
-              className="text-ink/40 hover:text-estado-incompleta transition-colors p-1"
-            >
-              <Trash2 size={16} />
-            </button>
-          </>
-        )}
-      </div>
-    </li>
-  );
+  return <li className="group relative min-w-0 overflow-hidden rounded-2xl border border-sakura-line bg-sakura-paper shadow-sakura-card transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-sakura-bloom hover:shadow-sakura-card-hover focus-within:border-sakura-bloom focus-within:shadow-sakura-card-hover"><span className={`absolute inset-y-0 left-0 w-1 ${acentoGenero}`} aria-hidden="true" /><button type="button" onClick={() => onAbrir(persona.id)} className="block min-h-36 w-full px-5 py-4 pl-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sakura-plum" aria-label={`Abrir ficha de ${persona.nombre} ${persona.apellido}`}><span className="block min-w-0"><span className="block font-display text-xl leading-tight text-sakura-plum">{persona.nombre}</span><span className="block truncate text-lg leading-tight text-sakura-ink">{persona.apellido}</span></span><span className="mt-5 block space-y-1.5 text-xs text-sakura-muted">{fechas.length > 0 && <span className="flex items-center gap-1.5"><CalendarDays size={14} aria-hidden="true" />{fechas.join(" — ")}</span>}{lugar && <span className="flex items-center gap-1.5 truncate" title={lugar}><MapPin size={14} className="shrink-0" aria-hidden="true" /><span className="truncate">{lugar}</span></span>}{!fechas.length && !lugar && <span className="text-sakura-muted">Sin fechas ni lugares registrados</span>}</span></button></li>;
 }

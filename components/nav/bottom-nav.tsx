@@ -10,7 +10,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navegación principal"
-      className="md:hidden fixed inset-x-0 bottom-0 z-10 flex items-stretch justify-around border-t border-border bg-background/95 backdrop-blur px-2 py-1.5"
+      className="md:hidden fixed inset-x-0 bottom-0 z-10 flex items-stretch justify-around border-t border-border bg-sakura-paper px-2 py-1.5 shadow-sakura-panel"
       style={{ paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))" }}
     >
       {navLinks.map(({ href, label, icon: Icon, principal }) => {

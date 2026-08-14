@@ -5,6 +5,17 @@ import { createClient } from "@/lib/supabase/server";
 import { personaTieneVinculos } from "@/lib/integridad-referencial";
 import type { Genero } from "@/lib/supabase/types";
 
+export interface ResultadoEliminarPersona {
+  error: string | null;
+  requiereEliminacionForzada?: boolean;
+  detalle?: string[];
+  dependencias?: {
+    vinculosFamiliares: number;
+    documentos: number;
+    entradasBitacora: number;
+  };
+}
+
 export interface PersonaFormInput {
   nombre: string;
   apellido: string;
@@ -33,6 +44,7 @@ function revalidarVistas() {
   revalidatePath("/archivo");
   revalidatePath("/archivo/[id]", "page");
   revalidatePath("/arbol");
+  revalidatePath("/bitacora");
 }
 
 export async function crearPersona(input: PersonaFormInput) {
@@ -88,7 +100,7 @@ export async function actualizarPersona(id: string, input: PersonaFormInput) {
   return { error: null };
 }
 
-export async function eliminarPersona(id: string) {
+export async function eliminarPersona(id: string): Promise<ResultadoEliminarPersona> {
   const supabase = await createClient();
 
   // Integridad referencial (distinto concepto del nivel de información):
@@ -100,8 +112,9 @@ export async function eliminarPersona(id: string) {
   // único que importa acá son los vínculos reales que tenga.
   let tieneVinculos = false;
   let detalle: string[] = [];
+  let dependencias: ResultadoEliminarPersona["dependencias"];
   try {
-    ({ tieneVinculos, detalle } = await personaTieneVinculos(supabase, id));
+    ({ tieneVinculos, detalle, dependencias } = await personaTieneVinculos(supabase, id));
   } catch (error) {
     console.error("Error al verificar vínculos antes de borrar:", error);
     return { error: "No se pudo verificar los vínculos de la persona." };
@@ -111,7 +124,10 @@ export async function eliminarPersona(id: string) {
     return {
       error: `No se puede eliminar: esta persona todavía tiene ${detalle.join(
         ", "
-      )} registrados. Eliminá esos vínculos primero.`,
+      )} registrados. Eliminá esos vínculos primero o confirmá la eliminación forzada.`,
+      requiereEliminacionForzada: true,
+      detalle,
+      dependencias,
     };
   }
 
@@ -120,6 +136,44 @@ export async function eliminarPersona(id: string) {
   if (error) {
     console.error("Error al eliminar persona:", error.message);
     return { error: "No se pudo eliminar la persona." };
+  }
+
+  revalidarVistas();
+  return { error: null };
+}
+
+// El borrado normal se mantiene deliberadamente bloqueado cuando hay
+// dependencias. Este segundo paso sólo se invoca después de una confirmación
+// explícita de la persona usuaria. La función SQL elimina la persona dentro
+// de una transacción y deja que las foreign keys limpien sus relaciones.
+export async function eliminarPersonaForzada(id: string): Promise<ResultadoEliminarPersona> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("eliminar_persona_forzada", {
+    persona_uuid: id,
+  });
+
+  if (error) {
+    console.error("Error al eliminar persona de forma forzada:", error.message);
+    return { error: "No se pudo eliminar la persona y sus datos asociados." };
+  }
+
+  // La función SQL sólo devuelve archivos de documentos que quedaron sin
+  // ninguna asociación. Los documentos compartidos nunca llegan a esta lista.
+  const rutasHuerfanas = ((data ?? []) as { archivo_url: string | null }[])
+    .map((documento) => documento.archivo_url)
+    .filter((ruta): ruta is string => !!ruta);
+
+  if (rutasHuerfanas.length > 0) {
+    const { error: errorStorage } = await supabase.storage
+      .from("documentos")
+      .remove(rutasHuerfanas);
+
+    // La operación de base ya fue confirmada de forma atómica. Storage no
+    // participa de esa transacción; registramos un fallo para poder depurarlo
+    // sin informar erróneamente que la persona todavía existe.
+    if (errorStorage) {
+      console.error("La persona se eliminó, pero no se pudieron limpiar algunos archivos huérfanos:", errorStorage.message);
+    }
   }
 
   revalidarVistas();

@@ -10,11 +10,11 @@ export function Sidebar() {
   return (
     <nav
       aria-label="Navegación principal"
-      className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 md:border-r md:border-border md:bg-background md:py-8 md:px-4"
+      className="hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-56 md:flex-col md:border-r md:border-sakura-line md:bg-sakura-canvas md:px-4 md:py-8"
     >
-      <span className="font-display text-lg text-velvet px-2 mb-8">
-        Árbol Familiar
-      </span>
+      <div className="mb-8 rounded-2xl border border-sakura-line bg-sakura-paper px-3.5 py-3.5 shadow-sakura-panel">
+        <span className="block font-display text-base font-semibold tracking-[.08em] text-sakura-plum">Árbol Biani</span>
+      </div>
 
       <ul className="flex flex-col gap-1">
         {navLinks.map(({ href, label, icon: Icon, principal }) => {
@@ -25,11 +25,11 @@ export function Sidebar() {
               <Link
                 href={href}
                 className={[
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-[background-color,color,box-shadow]",
                   principal ? "font-medium" : "font-normal",
                   activo
-                    ? "bg-lavender/50 text-velvet"
-                    : "text-ink/70 hover:bg-lavender/25 hover:text-velvet",
+                    ? "bg-sakura-petal text-sakura-plum shadow-sakura-card"
+                    : "text-sakura-muted hover:bg-sakura-lavender hover:text-sakura-plum",
                 ].join(" ")}
               >
                 <Icon size={principal ? 20 : 18} strokeWidth={1.75} />

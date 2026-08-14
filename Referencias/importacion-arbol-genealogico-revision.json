@@ -1,0 +1,1399 @@
+{
+  "fuente": {
+    "archivo": "Árbol Genealógico.xlsx",
+    "hojas_revisadas": [
+      "Biani",
+      "Acevey",
+      "Della Paolera",
+      "Podrecca"
+    ]
+  },
+  "criterio": {
+    "relaciones": "No se importan ni se infieren relaciones de filiación, cónyuge o hermanos.",
+    "fechas": "Sólo se cargan en campos de fecha los valores con día, mes y año inequívocos. Años, aproximaciones y dudas permanecen en notas.",
+    "nombres_relacionales": "Sólo se proponen menciones con nombre y apellido explícitos; las listas que sólo contienen nombres de pila quedan para revisión manual.",
+    "genero": "Se conserva no_definido porque el Excel no provee un campo de género confiable."
+  },
+  "resumen": {
+    "filas_principales_con_nombre": 21,
+    "personas_candidatas_detectadas": 52,
+    "existentes_reconocidos_sin_modificar": 2,
+    "propuestas_de_alta": 50
+  },
+  "personas": [
+    {
+      "persona": {
+        "nombre": "Francesco",
+        "apellido": "Biani",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1779 (figura su edad en acta de nacimiento del hijo Giuseppe)."
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 4,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-001",
+      "estado": "existente_reconocido",
+      "coincidencia_en_archivo": {
+        "id": "reconocido-en-archivo",
+        "motivo": "Nombre y año de nacimiento coinciden con Archivo Familiar."
+      }
+    },
+    {
+      "persona": {
+        "nombre": "Giovanni",
+        "apellido": "Biani",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1809-05-08",
+        "lugar_nacimiento": "Comune di Alta val Tidone, Pecorara, Provincia de Piacenza",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Profesión: Es la primera generación que en el acta de nacimiento figura que sus padres son \"propietarios\". Posteriormente son todos campesinos.\n\nDirecciones registradas: En todas las actas de nacimiento de sus hijos figura que están domiciliados en \"Poggiomoreico\" o algo así, que tal vez era una región cercana a Pecorara o dentro de Pecorara pero ya no existe. En su acta de nacimiento también figura que sus padres están domiciliados ahí. ACLARACIÓN: Poggio Moresco era una pate de Pecorara!!!\n\nNotas del Excel: WOOOOOOW: Su acta de nacimiento está escrita en francés por haber nacido en el estado civil napoleónico. Su nombre figura como Jean y el de su padre como Francois."
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 5,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-002",
+      "estado": "existente_reconocido",
+      "coincidencia_en_archivo": {
+        "id": "reconocido-en-archivo",
+        "motivo": "Nombre, fecha y lugar de nacimiento coinciden con Archivo Familiar."
+      }
+    },
+    {
+      "persona": {
+        "nombre": "Giuseppe",
+        "apellido": "Biani",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1848-07-23",
+        "lugar_nacimiento": "Comune di Alta val Tidone, Pecorara, Provincia de Piacenza",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": "Alcorta, Santa Fe",
+        "notas": "Fecha de defunción consignada sin precisión suficiente: 1898.0.\n\nDirecciones registradas: Todos los hijos bautizados en Morón\n\nNotas del Excel: En el acta de nacimiento de Luis Florencio, dice que él es el cuarto hijo del matrimonio, siendo el segundo hijo de su padre y el primero de su madre. No me dan las cuentas. Ninguno de los padrinos de los hijos son alguno de sus hermanos. Como María Biasotti es de Génova y no de la misma comune, es probable que se hayan casado en Argentina. Los datos de la defunción están en la partida de matrimonio de Juan Valentín. El matrimonio de Guiseppe fue en Morón o en Santa Fe? Lo más porbable que en Morón donde nacieron los hijos.\n\nInformación importante: En el acta de matrimonio de Pascuala Serafina, del año 1901, Giuseppe figura como fallecido. Ella se casó a los 17 años. El matrimonio fue en Alcorta. Dado que María Milani es de Alcorta, puede ser que la familia se haya mudado ahí. Búsqueda de hijos de Giuseppe en Italia antes de Juan Valentín: Carolina Biani nacida en 1869 noooo. VUIDO DE ROSA COLUMBA"
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 6,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-003",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Juan Valentín",
+        "apellido": "Biani",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1882-06-24",
+        "lugar_nacimiento": "Morón, provincia de Buenos Aires",
+        "fecha_fallecimiento": "1932-12-16",
+        "lugar_fallecimiento": "Juncal, Santa Fe",
+        "notas": "Notas del Excel: Agustín Alberto es el primer nacido en Juncal, los anteriores en Wheelwright"
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 7,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-004",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Remigio Lorenzo",
+        "apellido": "Biani",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1930-01-30",
+        "lugar_nacimiento": "Juncal, Santa Fe",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": "Buenos Aires",
+        "notas": "Fecha de defunción consignada sin precisión suficiente: 1995.0."
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 8,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-005",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Domingo",
+        "apellido": "Asebey",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1738.0."
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 2,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-006",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Juan Francisco",
+        "apellido": "Asebey",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": "Santiago de Compostela, Galicia (figura en su certificado de matrimonio y en el censo de hacendados)",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1760.0.\n\nProfesión: 1789: Tesorero de bulas\n\nNotas del Excel: Censo de hacendados en capilla del señor 1789: Link"
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 3,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-007",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Juan Luis",
+        "apellido": "Acebey",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": "Capilla del Señor",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1780.0."
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 4,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-008",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Mateo",
+        "apellido": "Acebey",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1817-10-21",
+        "lugar_nacimiento": "Capilla del Señor",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Notas del Excel: Bautismo: 5/10/1817"
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 5,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-009",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Rufino",
+        "apellido": "Acevey",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1839.0.\n\nProfesión: Empleado\n\nNotas del Excel: CENSO 1869: Vivían en Luján. Emilia Espinosa no sabía leer ni escribir. CENSO 1895 es de la CIUDAD DE BUENOS AIRES, es decir que se mudaron de Luján a la capital y figura como viudo. Figura que tuvo 11 hijos. En el censo una pregunta es \"Tiene Bocio?\" que es el agrandamiento de la tiroides por falta de iodo. Por ahí era algo común. Su hijo Rufino aparece que tiene 28 años."
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 6,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-010",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Rufino",
+        "apellido": "Acevey",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1868-01-26",
+        "lugar_nacimiento": "Luján",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Direcciones registradas: Estados Unidos 2675 - Soria 1855 - Garay 2515 CABA\n\nNotas del Excel: Los Bautismos de los hijos son todos en CABA, en la Parroquia San Cristóbal San Cristóbal"
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 7,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-011",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Rufino Obdulio",
+        "apellido": "Acevey",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1905-06-15",
+        "lugar_nacimiento": "CABA",
+        "fecha_fallecimiento": "1978-08-18",
+        "lugar_fallecimiento": "CABA",
+        "notas": "Notas del Excel: Bautismo en Parroquia San Cristóbal Jujuy 1241. Posible DNI de Nelly 27-02910701-2"
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 8,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-012",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Alessandro Alfonzo",
+        "apellido": "Della Paoelra",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 2,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-013",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Michellangelo",
+        "apellido": "Della Paolera",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": "Castello del Matese, Caserta, Campinia, Italia",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": "Castello del Matese, Caserta, Campinia, Italia",
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1759.0.\n\nFecha de defunción consignada sin precisión suficiente: 1847.0.\n\nProfesión: Pittore (1810), Sindaco (1813)\n\nNotas del Excel: Nicola tuvo una hija Anna della Paolera que emigró a Estados Unidos"
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 3,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-014",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Próspero",
+        "apellido": "Della Paolera",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": "Castello del Matese, Caserta, Campinia, Italia",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1809.0."
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 4,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-015",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Pietro",
+        "apellido": "Della Paolera",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1856-12-08",
+        "lugar_nacimiento": "Castello del Matese, Caserta, Campinia, Italia",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Direcciones registradas: Bermejo 125. Ballini 5594. Cangollo 3599.\n\nNotas del Excel: Censo de 1895 vive en Buenos Aires. Su hija Clotilda Victoria fue bautizada en Balvanera y sus padrinos eran italianos que vivían en La Boca. María Dominga también bautizada en Balvanera. Peregrina se casó en Corrientes y vivió ahí con su familia, es la única ue tiene hijos además de Próspero."
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 5,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-016",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Próspero José Arone",
+        "apellido": "Della Paolera",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1884-12-19",
+        "lugar_nacimiento": "Argentina",
+        "fecha_fallecimiento": "1946-05-30",
+        "lugar_fallecimiento": "Villa Urquiza, Capital Federal",
+        "notas": "Direcciones registradas: Conesa 977\n\nNotas del Excel: La segunda esposa María Francisca también era viuda"
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 6,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-017",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Giovanni",
+        "apellido": "Podrecca",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": "Azzida, San Pietro al Natisone, Udine, Italia",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de defunción consignada sin precisión suficiente: Antes de 1898."
+      },
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 5,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-018",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Giovanni",
+        "apellido": "Podrecca",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": "Azzida, San Pietro al Natisone, Udine, Italia",
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1861 probab.\n\nFecha de defunción consignada sin precisión suficiente: Después de 1927.\n\nDirecciones registradas: casa número 48, Azzida\n\nNotas del Excel: En octubre de 1898 tenía 37 años, en mayo de 1898 tenía 37, en abril de 1899 tenía 38 y en octubre de 1900 tenía 39 años. Mariana Venturini dice que nació en \"Podvarsci\"\n\nInformación importante: En el acta de nacimiento de Geremia y de su hermana Anna, en nombre de Giovanni figura como \"Podrecca Giovanni fu Giovanni\" indicando que su pare también se llama Giovanni pero está fallecido."
+      },
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 6,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-019",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Geremia Giuseppe",
+        "apellido": "Podrecca",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1900-10-20",
+        "lugar_nacimiento": "Azzida, San Pietro al Natisone, Udine, Italia",
+        "fecha_fallecimiento": "1962-07-20",
+        "lugar_fallecimiento": "Victoria, Buenos Aires",
+        "notas": "Direcciones registradas: Al casarse su dirección era 11 de Septiembre 3780 y la dirección de Livia era 11 de Septiembre 3558.\n\nNotas del Excel: Llegó a Argentina en el barco Taormina el 6/10/1923. Once de Septiembre es la actual Avenida Libertador."
+      },
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 7,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-020",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Esther Iris",
+        "apellido": "Podrecca",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1931-09-13",
+        "lugar_nacimiento": "Victoria, Buenos Aires",
+        "fecha_fallecimiento": "2021-01-20",
+        "lugar_fallecimiento": "Victoria, Buenos Aires",
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 8,
+          "columna": "Nombre"
+        }
+      ],
+      "id_propuesta": "excel-021",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Domenica",
+        "apellido": "Bertola",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 5,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-022",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Rosa",
+        "apellido": "Ferri",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "También aparece como “Rosa Serafina” en la fuente."
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 5,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Biani",
+          "fila": 6,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-023",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "María",
+        "apellido": "Biasotti",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 6,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "id_propuesta": "excel-024",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "María Magdalena",
+        "apellido": "Milani",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1893-03-03",
+        "lugar_nacimiento": "Alcorta",
+        "fecha_fallecimiento": "1970-02-25",
+        "lugar_fallecimiento": "Victoria",
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 7,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Biani",
+          "fila": 8,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-025",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Gustavo Ricardo",
+        "apellido": "Biani",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1959-05-08",
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 8,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Podrecca",
+          "fila": 8,
+          "columna": "Nombres de los hijos"
+        }
+      ],
+      "id_propuesta": "excel-026",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Graciela Bernardita",
+        "apellido": "Biani",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 17/5/1961?."
+      },
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 8,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Podrecca",
+          "fila": 8,
+          "columna": "Nombres de los hijos"
+        }
+      ],
+      "id_propuesta": "excel-027",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Josefa",
+        "apellido": "Varela",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1740-xxxx."
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 2,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 3,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-028",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Francisca",
+        "apellido": "Ávalos",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 3,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 4,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-029",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Martina",
+        "apellido": "Correa",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1780-xxxx."
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 4,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 5,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-030",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Josefa",
+        "apellido": "Burgos",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1815-xxxx."
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 5,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 6,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-031",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Emilia",
+        "apellido": "Espinosa",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1840-08-14",
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 6,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 7,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-032",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Matilde Florentina",
+        "apellido": "Lopez",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 7,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 8,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-033",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Nelly",
+        "apellido": "Cerliani",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 8,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "id_propuesta": "excel-034",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Irene Angélica",
+        "apellido": "Della Paolera",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 8,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "id_propuesta": "excel-035",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Susana Marta",
+        "apellido": "Acevey",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 8,
+          "columna": "Nombres de los hijos"
+        }
+      ],
+      "id_propuesta": "excel-036",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Graciela Mirta",
+        "apellido": "Acevey",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 8,
+          "columna": "Nombres de los hijos"
+        }
+      ],
+      "id_propuesta": "excel-037",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Vicenza",
+        "apellido": "Buonotempo",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1764-xxxx."
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 3,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Della Paolera",
+          "fila": 4,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-038",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Mariantonieta",
+        "apellido": "Di Gregorio",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 4,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Della Paolera",
+          "fila": 5,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-039",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Catalina",
+        "apellido": "Costa",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1862-xxxx."
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 5,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Della Paolera",
+          "fila": 6,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-040",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "José",
+        "apellido": "Costa",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 5,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "id_propuesta": "excel-041",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Clara",
+        "apellido": "Agustino",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 5,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "id_propuesta": "excel-042",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Luisa",
+        "apellido": "Soriano",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": "1924-07-06",
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin estructurar: 5/10/1989. Resulta cronológicamente incompatible con el resto de la fila y no se corrige por inferencia."
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 6,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "id_propuesta": "excel-043",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "María Francisca Ezequiela",
+        "apellido": "De Luque",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1897-xxxx."
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 6,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "id_propuesta": "excel-044",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Peregrina Catalina Lidia",
+        "apellido": "Della Paolera",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1893-1944."
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 5,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Della Paolera",
+          "fila": 6,
+          "columna": "Nombre de los hermanos"
+        }
+      ],
+      "id_propuesta": "excel-045",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Teresa",
+        "apellido": "Ruibal",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 6,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "id_propuesta": "excel-046",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Antonio",
+        "apellido": "Soriano",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 6,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "id_propuesta": "excel-047",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Catterina",
+        "apellido": "Venturini",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "La fuente indica que murió antes de 1898; no se crea una fecha exacta."
+      },
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 5,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Podrecca",
+          "fila": 6,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-048",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Marianna",
+        "apellido": "Birtig",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": "Fecha de nacimiento consignada sin precisión suficiente: 1875-xxxx."
+      },
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 6,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Podrecca",
+          "fila": 7,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-049",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Livia Ermenegilda",
+        "apellido": "Carniello",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 7,
+          "columna": "Nombre del cónyuge"
+        },
+        {
+          "hoja": "Podrecca",
+          "fila": 8,
+          "columna": "Nombre de la madre"
+        }
+      ],
+      "id_propuesta": "excel-050",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Anna Maria",
+        "apellido": "Podrecca",
+        "genero": "no_definido",
+        "fecha_nacimiento": "1898-10-23",
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": "1899-04-26",
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 6,
+          "columna": "Nombres de los hijos"
+        }
+      ],
+      "id_propuesta": "excel-051",
+      "estado": "propuesta_importar"
+    },
+    {
+      "persona": {
+        "nombre": "Bruno",
+        "apellido": "Podrecca",
+        "genero": "no_definido",
+        "fecha_nacimiento": null,
+        "lugar_nacimiento": null,
+        "fecha_fallecimiento": null,
+        "lugar_fallecimiento": null,
+        "notas": null
+      },
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 8,
+          "columna": "Nombre de los hermanos"
+        }
+      ],
+      "id_propuesta": "excel-052",
+      "estado": "propuesta_importar"
+    }
+  ],
+  "posibles_duplicados": [
+    {
+      "mencion": "Juan Luis Acevey",
+      "fuente": {
+        "hoja": "Acevey",
+        "fila": 5,
+        "columna": "Nombre del padre"
+      },
+      "posible_coincidencia": "Juan Luis Acebey (Acevey/Acebey)",
+      "decision": "No crear una ficha adicional; requiere revisión ortográfica antes de unificar."
+    },
+    {
+      "mencion": "Michellangelo della Polera",
+      "fuente": {
+        "hoja": "Della Paolera",
+        "fila": 4,
+        "columna": "Nombre del padre"
+      },
+      "posible_coincidencia": "Michellangelo Della Paoelra",
+      "decision": "Se trata como variante de escritura de la fila principal; no se crea otra ficha."
+    },
+    {
+      "mencion": "Próspero della Paolera",
+      "fuente": {
+        "hoja": "Della Paolera",
+        "fila": 5,
+        "columna": "Nombre del padre"
+      },
+      "posible_coincidencia": "Próspero Della Paolera",
+      "decision": "Se trata como variante de mayúsculas y acento de la fila principal; no se crea otra ficha."
+    },
+    {
+      "mencion": "Geremia Giuseppe Podreca",
+      "fuente": {
+        "hoja": "Podrecca",
+        "fila": 8,
+        "columna": "Nombre del padre"
+      },
+      "posible_coincidencia": "Geremia Giuseppe Podrecca",
+      "decision": "Se trata como variante de una letra de la fila principal; no se crea otra ficha."
+    },
+    {
+      "mencion": "Giuseppe Podrecca",
+      "fuente": {
+        "hoja": "Podrecca",
+        "fila": 7,
+        "columna": "Nombre del padre"
+      },
+      "posible_coincidencia": "Giovanni Podrecca (dos filas principales)",
+      "decision": "Ambiguo: no se crea ni se fusiona una ficha."
+    }
+  ],
+  "datos_ambiguos_u_omitidos": [
+    {
+      "fuentes": [
+        {
+          "hoja": "Biani",
+          "fila": 5,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Biani",
+          "fila": 6,
+          "columna": "Nombre de los hermanos"
+        },
+        {
+          "hoja": "Biani",
+          "fila": 6,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Biani",
+          "fila": 7,
+          "columna": "Nombre de los hermanos"
+        },
+        {
+          "hoja": "Biani",
+          "fila": 7,
+          "columna": "Nombres de los hijos"
+        }
+      ],
+      "motivo": "Listas con nombres de pila sin apellido (por ejemplo Antonia, Paolo, José Valentín). No se infiere un apellido."
+    },
+    {
+      "fuentes": [
+        {
+          "hoja": "Acevey",
+          "fila": 3,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 4,
+          "columna": "Nombre de los hermanos"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 4,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 5,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 6,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 7,
+          "columna": "Nombre de los hermanos"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 7,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Acevey",
+          "fila": 8,
+          "columna": "Nombre de los hermanos"
+        }
+      ],
+      "motivo": "Listas con nombres de pila, abreviaturas (NN) o apellidos no explícitos. Sólo se seleccionaron los nombres completos de Susana y Graciela Acevey."
+    },
+    {
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 3,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Della Paolera",
+          "fila": 4,
+          "columna": "Nombre de los hermanos"
+        },
+        {
+          "hoja": "Della Paolera",
+          "fila": 4,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Della Paolera",
+          "fila": 5,
+          "columna": "Nombre de los hermanos"
+        },
+        {
+          "hoja": "Della Paolera",
+          "fila": 5,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Della Paolera",
+          "fila": 6,
+          "columna": "Nombres de los hijos"
+        }
+      ],
+      "motivo": "Listas con nombres de pila sin apellido. Sólo se propuso Peregrina Catalina Lidia della Paolera porque su apellido sí está explícito."
+    },
+    {
+      "fuentes": [
+        {
+          "hoja": "Podrecca",
+          "fila": 6,
+          "columna": "Nombres de los hijos"
+        },
+        {
+          "hoja": "Podrecca",
+          "fila": 8,
+          "columna": "Nombres de los hijos"
+        }
+      ],
+      "motivo": "Se dejó sin alta María Teresa Catalina e Irene Angélica de la lista de hijos porque no traen apellido; Irene Angélica della Paolera se propone únicamente por la mención completa de Acevey."
+    },
+    {
+      "fuentes": [
+        {
+          "hoja": "Della Paolera",
+          "fila": 6,
+          "columna": "Nombre del cónyuge"
+        }
+      ],
+      "motivo": "La fecha “5/10/1989” de Luisa Soriano resulta inconsistente con el contexto cronológico. Se conserva como nota, no como fecha estructurada."
+    }
+  ]
+}

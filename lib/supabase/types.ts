@@ -118,4 +118,15 @@ export interface PersonaFicha extends PersonaConNivel {
   padres: VinculoFiliacionFicha[];
   hijos: VinculoFiliacionFicha[];
   conyuges: VinculoConyugeFicha[];
+  documentos: Documento[];
+  entradas_bitacora: EntradaBitacora[];
+}
+
+// Forma de lectura para el mapa del Árbol. Los hermanos se derivan de la
+// filiación compartida; no existe una tabla ni una relación propia para ellos.
+export interface PersonaArbol extends Persona {
+  padres_ids: string[];
+  hijos_ids: string[];
+  conyuges_ids: string[];
+  hermanos_ids: string[];
 }

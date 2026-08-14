@@ -3,32 +3,90 @@
 @tailwind utilities;
 
 :root {
-  /* Tipografía: "Maaz" es la candidata inicial (ver Especificación,
-     sección Tipografía). Se define acá como variable para poder
-     enchufarla o reemplazarla en la Etapa 5 sin tocar componentes. */
   --font-display: system-ui, sans-serif;
   --font-body: system-ui, sans-serif;
+
+  /* Sistema Sakura: única fuente de valores cromáticos de la aplicación. */
+  --sakura-canvas: 251 249 251;
+  --sakura-paper: 255 252 254;
+  --sakura-petal: 248 238 242;
+  --sakura-bloom: 235 203 213;
+  --sakura-rose: 182 109 132;
+  --sakura-lavender: 233 228 241;
+  --sakura-plum: 73 53 95;
+  --sakura-ink: 45 40 48;
+  --sakura-muted: 110 101 112;
+  --sakura-line: 231 220 227;
+  --sakura-branch: 118 109 105;
+  --sakura-masculino: 89 117 145;
+  --sakura-femenino: 201 132 149;
+  --sakura-indefinido: 155 150 153;
+  --sakura-confirmada: 78 123 96;
+  --sakura-pendiente: 173 133 68;
+  --sakura-incompleta: 168 91 79;
+
+  --sakura-shadow-soft: 0 8px 22px -18px rgb(var(--sakura-plum) / 0.46);
+  --sakura-shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.92), 0 14px 35px -28px rgb(var(--sakura-plum) / 0.55);
+  --sakura-shadow-card: 0 10px 24px -18px rgb(var(--sakura-plum) / 0.4);
+  --sakura-shadow-card-hover: 0 16px 30px -20px rgb(var(--sakura-plum) / 0.52);
+  --sakura-shadow-float: 0 20px 52px -28px rgb(var(--sakura-plum) / 0.46);
+  --sakura-shadow-drawer: -18px 0 42px -24px rgb(var(--sakura-plum) / 0.46);
 }
 
-html,
-body {
-  height: 100%;
-}
-
-body {
-  @apply bg-background text-ink font-body antialiased;
-}
-
-* {
-  @apply border-border;
-}
+html, body { height: 100%; }
+body { @apply bg-background text-ink font-body antialiased; }
+* { @apply border-border; }
+::selection { background: rgb(var(--sakura-bloom) / 0.7); color: rgb(var(--sakura-plum)); }
 
 @layer components {
-  .campo {
-    @apply w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-velvet;
-  }
+  .campo { @apply w-full rounded-xl border border-border bg-sakura-paper px-3 py-2 text-sm text-ink outline-none transition-[border-color,box-shadow] placeholder:text-ink/40 focus:border-sakura-rose focus:ring-2 focus:ring-sakura-petal; }
+  .boton-secundario { @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-sakura-paper px-3 py-2 text-sm font-medium text-velvet shadow-sakura-card transition-[background-color,border-color,box-shadow] hover:border-sakura-bloom hover:bg-sakura-petal hover:shadow-sakura-card-hover disabled:cursor-not-allowed disabled:opacity-50; }
+}
 
-  .boton-secundario {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm font-medium text-velvet transition-colors hover:bg-lavender/30 disabled:cursor-not-allowed disabled:opacity-50;
-  }
+/* family-chart conserva su layout y relaciones: estas reglas sólo trabajan
+   sobre capas, color y tarjetas. La flora está fuera del SVG que recibe pan y
+   zoom, por eso permanece fija y no intercepta interacciones. */
+.arbol-mapa.f3 {
+  --female-color: rgb(var(--sakura-femenino));
+  --male-color: rgb(var(--sakura-masculino));
+  --genderless-color: rgb(var(--sakura-branch));
+  --background-color: rgb(var(--sakura-canvas));
+  --text-color: rgb(var(--sakura-ink));
+  position: relative; z-index: 1; isolation: isolate;
+  width: 100%; height: 100%; max-height: none; overflow: hidden;
+  background: transparent; color: rgb(var(--sakura-ink));
+}
+
+.arbol-mapa path.link { stroke: rgb(var(--sakura-branch)); stroke-width: 1.6px; opacity: 0.76; }
+.arbol-mapa .card_cont { pointer-events: none; }
+.arbol-mapa .card-inner, .arbol-mapa .card_cont .card { pointer-events: auto; }
+.arbol-mapa .card-inner { width: 164px; height: 76px; overflow: visible; background: transparent; }
+.arbol-mapa .card-rect, .arbol-mapa .card-body-rect, .arbol-mapa .text-overflow-mask { display: none; }
+
+.arbol-nodo {
+  display: flex; width: 164px; min-height: 76px; cursor: pointer;
+  flex-direction: column; justify-content: center;
+  border: 1px solid rgb(var(--sakura-line)); border-left: 4px solid var(--genderless-color);
+  border-radius: 14px; background: rgb(var(--sakura-paper)); padding: 11px 13px;
+  box-shadow: var(--sakura-shadow-card); color: rgb(var(--sakura-ink));
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease;
+}
+.arbol-mapa .card-female .arbol-nodo { border-left-color: rgb(var(--sakura-femenino)); }
+.arbol-mapa .card-male .arbol-nodo { border-left-color: rgb(var(--sakura-masculino)); }
+.arbol-mapa .arbol-nodo-sin-linea-sangre { border-color: rgb(var(--sakura-line)); border-left-color: rgb(var(--sakura-branch)); background: rgb(var(--sakura-paper) / 0.92); box-shadow: 0 6px 16px -11px rgb(var(--sakura-branch) / 0.3); }
+.arbol-nodo:hover, .arbol-nodo:focus-visible { border-color: rgb(var(--sakura-rose)); box-shadow: var(--sakura-shadow-card-hover); outline: none; transform: translateY(-2px); }
+.arbol-nodo-seleccionado { border: 2px solid rgb(var(--sakura-plum)); border-left: 6px solid rgb(var(--sakura-plum)) !important; background: rgb(var(--sakura-petal)); box-shadow: 0 0 0 4px rgb(var(--sakura-bloom) / 0.55), 0 14px 28px -10px rgb(var(--sakura-plum) / 0.4); }
+.arbol-nodo-nombre { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display), system-ui, sans-serif; font-size: 14px; font-weight: 700; line-height: 1.25; color: rgb(var(--sakura-plum)); }
+.arbol-nodo-anios { margin-top: 4px; font-size: 11px; line-height: 1; color: rgb(var(--sakura-muted)); }
+.arbol-zoom-lejos .arbol-nodo { min-height: 42px; padding: 7px 9px; border-left-width: 3px; border-radius: 9px; }
+.arbol-zoom-lejos .arbol-nodo-nombre, .arbol-zoom-lejos .arbol-nodo-anios { display: none; }
+.arbol-zoom-lejos .arbol-nodo::after { content: "•"; color: rgb(var(--sakura-plum)); font-size: 18px; line-height: 1; text-align: center; }
+.arbol-raiz-tecnica { display: none; }
+
+.arbol-control { display: inline-flex; min-height: 40px; min-width: 40px; align-items: center; justify-content: center; color: rgb(var(--sakura-muted)); transition: background-color 150ms ease, color 150ms ease; }
+.arbol-control:hover, .arbol-control:focus-visible { background: rgb(var(--sakura-petal)); color: rgb(var(--sakura-plum)); outline: none; }
+.arbol-mapa + div, .arbol-mapa ~ aside { border-color: rgb(var(--sakura-line)) !important; background: rgb(var(--sakura-paper)) !important; box-shadow: var(--sakura-shadow-float) !important; backdrop-filter: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

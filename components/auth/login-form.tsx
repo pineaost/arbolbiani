@@ -39,7 +39,7 @@ export function LoginForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-6 shadow-soft"
+      className="flex flex-col gap-4 rounded-2xl border border-border bg-sakura-paper p-6 shadow-sakura-float"
     >
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm text-ink/70">
