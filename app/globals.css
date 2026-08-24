@@ -54,6 +54,34 @@ body { @apply bg-background text-ink font-body antialiased; }
   .boton-secundario { @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-sakura-paper px-3 py-2 text-sm font-medium text-velvet shadow-sakura-card transition-[background-color,border-color,box-shadow] hover:border-sakura-bloom hover:bg-sakura-petal hover:shadow-sakura-card-hover disabled:cursor-not-allowed disabled:opacity-50; }
 }
 
+/* La edición demo de Paper Daisy no incluye caracteres internacionales. La
+   letra real se conserva para lectura, selección y copiado; visualmente se
+   compone con la A de la fuente y una tilde proporcional a su trazo. */
+.paper-daisy-acento-agudo {
+  position: relative;
+  display: inline-block;
+  width: 0.48em;
+  color: transparent;
+}
+.paper-daisy-acento-agudo::before {
+  content: "A";
+  position: absolute;
+  inset: 0;
+  color: rgb(var(--sakura-plum));
+}
+.paper-daisy-acento-agudo::after {
+  content: "";
+  position: absolute;
+  top: 0.06em;
+  left: 0.35em;
+  width: 0.16em;
+  height: 0.045em;
+  border-radius: 999px;
+  background: rgb(var(--sakura-plum));
+  transform: rotate(-52deg);
+  transform-origin: center;
+}
+
 /* family-chart conserva su layout y relaciones: estas reglas sólo trabajan
    sobre capas, color y tarjetas. La flora está fuera del SVG que recibe pan y
    zoom, por eso permanece fija y no intercepta interacciones. */
