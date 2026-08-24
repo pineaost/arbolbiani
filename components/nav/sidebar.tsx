@@ -32,7 +32,7 @@ export function Sidebar() {
   return (
     <nav
       aria-label="Navegación principal"
-      className="hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-56 md:flex-col md:border-r md:border-sakura-line md:bg-sakura-canvas md:px-4 md:py-8"
+      className="hidden md:fixed md:inset-y-0 md:left-0 md:z-20 md:flex md:w-56 md:flex-col md:border-r md:border-sakura-line md:bg-sakura-canvas md:px-4 md:py-8"
     >
       <div className="mb-8 rounded-2xl border border-sakura-line bg-sakura-lavender px-4 py-5 text-center shadow-sakura-panel">
         <span className="block font-brand text-4xl font-bold leading-[1.05] tracking-[-0.035em] text-sakura-plum">Árbol Biani</span>
