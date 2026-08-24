@@ -2,9 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "Paper Daisy";
+  src: url("/fonts/paperdaisy-demo.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   --font-display: system-ui, sans-serif;
   --font-body: system-ui, sans-serif;
+  --font-brand: "Paper Daisy", "Segoe Print", cursive;
 
   /* Sistema Sakura: única fuente de valores cromáticos de la aplicación. */
   --sakura-canvas: 251 249 251;
