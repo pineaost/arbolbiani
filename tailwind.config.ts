@@ -18,6 +18,7 @@ const config: Config = {
           paper: "rgb(var(--sakura-paper) / <alpha-value>)",
           petal: "rgb(var(--sakura-petal) / <alpha-value>)",
           bloom: "rgb(var(--sakura-bloom) / <alpha-value>)",
+          blush: "rgb(var(--sakura-blush) / <alpha-value>)",
           rose: "rgb(var(--sakura-rose) / <alpha-value>)",
           lavender: "rgb(var(--sakura-lavender) / <alpha-value>)",
           plum: "rgb(var(--sakura-plum) / <alpha-value>)",
