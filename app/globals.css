@@ -2,18 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-  font-family: "Paper Daisy";
-  src: url("/fonts/paperdaisy-demo.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
 :root {
   --font-display: system-ui, sans-serif;
   --font-body: system-ui, sans-serif;
-  --font-brand: "Paper Daisy", "Segoe Print", cursive;
 
   /* Sistema Sakura: única fuente de valores cromáticos de la aplicación. */
   --sakura-canvas: 251 249 251;
@@ -52,34 +43,6 @@ body { @apply bg-background text-ink font-body antialiased; }
 @layer components {
   .campo { @apply w-full rounded-xl border border-border bg-sakura-paper px-3 py-2 text-sm text-ink outline-none transition-[border-color,box-shadow] placeholder:text-ink/40 focus:border-sakura-rose focus:ring-2 focus:ring-sakura-petal; }
   .boton-secundario { @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-sakura-paper px-3 py-2 text-sm font-medium text-velvet shadow-sakura-card transition-[background-color,border-color,box-shadow] hover:border-sakura-bloom hover:bg-sakura-petal hover:shadow-sakura-card-hover disabled:cursor-not-allowed disabled:opacity-50; }
-}
-
-/* La edición demo de Paper Daisy no incluye caracteres internacionales. La
-   letra real se conserva para lectura, selección y copiado; visualmente se
-   compone con la A de la fuente y una tilde proporcional a su trazo. */
-.paper-daisy-acento-agudo {
-  position: relative;
-  display: inline-block;
-  width: 0.48em;
-  color: transparent;
-}
-.paper-daisy-acento-agudo::before {
-  content: "A";
-  position: absolute;
-  inset: 0;
-  color: rgb(var(--sakura-plum));
-}
-.paper-daisy-acento-agudo::after {
-  content: "";
-  position: absolute;
-  top: 0.06em;
-  left: 0.35em;
-  width: 0.16em;
-  height: 0.045em;
-  border-radius: 999px;
-  background: rgb(var(--sakura-plum));
-  transform: rotate(-52deg);
-  transform-origin: center;
 }
 
 /* family-chart conserva su layout y relaciones: estas reglas sólo trabajan
