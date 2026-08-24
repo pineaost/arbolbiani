@@ -28,6 +28,7 @@
   --sakura-muted: 110 101 112;
   --sakura-line: 231 220 227;
   --sakura-branch: 118 109 105;
+  --sakura-vinculo: 131 109 110;
   --sakura-masculino: 89 117 145;
   --sakura-femenino: 201 132 149;
   --sakura-indefinido: 155 150 153;
@@ -67,7 +68,7 @@ body { @apply bg-background text-ink font-body antialiased; }
   background: transparent; color: rgb(var(--sakura-ink));
 }
 
-.arbol-mapa path.link { stroke: rgb(var(--sakura-branch)); stroke-width: 1.6px; opacity: 0.76; }
+.arbol-mapa path.link { fill: none; stroke: rgb(var(--sakura-vinculo)); stroke-width: 1.6px; stroke-linecap: round; stroke-linejoin: round; opacity: 0.76; transition: stroke 200ms ease; }
 .arbol-mapa .card_cont { pointer-events: none; }
 .arbol-mapa .card-inner, .arbol-mapa .card_cont .card { pointer-events: auto; }
 .arbol-mapa .card-inner { width: 164px; height: 76px; overflow: visible; background: transparent; }
