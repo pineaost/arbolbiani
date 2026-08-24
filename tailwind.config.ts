@@ -44,6 +44,7 @@ const config: Config = {
         },
       },
       fontFamily: {
+        brand: ["var(--font-brand)", "cursive"],
         display: ["var(--font-display)", "system-ui", "sans-serif"],
         body: ["var(--font-body)", "system-ui", "sans-serif"],
       },
