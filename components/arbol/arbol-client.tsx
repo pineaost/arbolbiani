@@ -80,7 +80,8 @@ export function ArbolClient({ personas }: Props) {
         const nombre = datosPersona.nombre ?? "";
         const apellido = datosPersona.apellido ?? "";
         const claseLineaSangre = datosPersona.sinLineaSangre ? " arbol-nodo-sin-linea-sangre" : "";
-        return `<div class="arbol-nodo${claseLineaSangre}" data-persona-id="${escaparHtml(datum.data.id)}" role="button" tabindex="0" aria-label="Abrir ficha de ${escaparHtml(`${nombre} ${apellido}`)}"><span class="arbol-nodo-nombre">${escaparHtml(nombre)} ${escaparHtml(apellido)}</span>${datosPersona.anios ? `<span class="arbol-nodo-anios">${escaparHtml(datosPersona.anios)}</span>` : ""}</div>`;
+        const claseGenero = datosPersona.sinGeneroDefinido ? " arbol-nodo-sin-genero" : "";
+        return `<div class="arbol-nodo${claseLineaSangre}${claseGenero}" data-persona-id="${escaparHtml(datum.data.id)}" role="button" tabindex="0" aria-label="Abrir ficha de ${escaparHtml(`${nombre} ${apellido}`)}"><span class="arbol-nodo-nombre">${escaparHtml(nombre)} ${escaparHtml(apellido)}</span>${datosPersona.anios ? `<span class="arbol-nodo-anios">${escaparHtml(datosPersona.anios)}</span>` : ""}</div>`;
       }).setOnCardClick((_event: MouseEvent, datum: { data: { id: string } }) => { if (datum.data.id !== RAIZ_MAPA_ID) setPersonaSeleccionadaId(datum.data.id); });
       chart.setAfterUpdate(() => actual.querySelectorAll<SVGPathElement>("path.link").forEach((path) => {
         // Sólo se ocultan los enlaces creados por la raíz de layout. El
