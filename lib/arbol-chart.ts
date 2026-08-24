@@ -4,7 +4,7 @@ export const RAIZ_MAPA_ID = "__arbol_mapa_raiz__";
 
 export interface DatoFamilyChart {
   id: string;
-  data: { gender: "M" | "F"; nombre?: string; apellido?: string; anios?: string; iniciales?: string; orden: string; virtual?: boolean; sinLineaSangre?: boolean };
+  data: { gender: "M" | "F"; nombre?: string; apellido?: string; anios?: string; iniciales?: string; orden: string; virtual?: boolean; sinLineaSangre?: boolean; sinGeneroDefinido?: boolean };
   rels: { parents: string[]; children: string[]; spouses: string[] };
 }
 
@@ -181,6 +181,10 @@ export function crearDatosFamilyChart(entrada: PersonaArbol[]): DatoFamilyChart[
       sinLineaSangre: (modelo.padresPorHijo.get(persona.id)?.size ?? 0) === 0
         && (modelo.hijosPorPadre.get(persona.id)?.size ?? 0) === 0
         && (modelo.conyugesPorPersona.get(persona.id)?.size ?? 0) > 0,
+      // Puramente visual: pinta la ficha en tono neutro cuando no hay género
+      // cargado, sin tocar `gender` (M/F), que sigue usando family-chart para
+      // el layout y el orden de cónyuges dentro de cada generación.
+      sinGeneroDefinido: persona.genero === "no_definido",
     },
     rels: {
       parents: ordenarIds(modelo.padresPorHijo.get(persona.id) ?? [], modelo.personas),
