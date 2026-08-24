@@ -16,6 +16,23 @@ function anios(persona: PersonaArbol) { return [persona.fecha_nacimiento?.slice(
 function lugarPrincipal(persona: PersonaArbol) { return persona.lugar_nacimiento ?? persona.lugar_fallecimiento ?? null; }
 function escaparHtml(valor: unknown) { return String(valor ?? "").replace(/[&<>'"]/g, (caracter) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[caracter] ?? caracter); }
 
+// Convierte el trazo recto/ortogonal que entrega family-chart en una curva
+// suave tipo d3.linkVertical: mismos puntos de entrada y salida, con un
+// control en el punto medio vertical entre ambos. Es puramente estético
+// -no toca relaciones, ids ni datos- y se recalcula en cada render porque
+// se deriva sólo de las coordenadas visibles del propio trazo. Para
+// vínculos casi horizontales (cónyuges) el resultado da, por cálculo, una
+// curva casi recta: no hace falta distinguir el tipo de relación.
+function suavizarTrazoVinculo(path: SVGPathElement) {
+  const numeros = path.getAttribute("d")?.match(/-?\d+(?:\.\d+)?/g);
+  if (!numeros || numeros.length < 4) return;
+  const [x1, y1] = numeros.slice(0, 2).map(Number);
+  const [x2, y2] = numeros.slice(-2).map(Number);
+  if ([x1, y1, x2, y2].some((valor) => Number.isNaN(valor))) return;
+  const yMedio = (y1 + y2) / 2;
+  path.setAttribute("d", `M${x1},${y1} C${x1},${yMedio} ${x2},${yMedio} ${x2},${y2}`);
+}
+
 export function ArbolClient({ personas }: Props) {
   const contenedorRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<FamilyChart | null>(null);
@@ -90,7 +107,11 @@ export function ArbolClient({ personas }: Props) {
         // criterio anterior inspeccionaba objetos internos de d3 y podía
         // confundir endpoints de relaciones reales con la raíz virtual.
         const link = (path as SVGPathElement & { __data__?: { id?: string } }).__data__;
-        path.style.display = link?.id?.includes(RAIZ_MAPA_ID) ? "none" : "";
+        const esRaizTecnica = link?.id?.includes(RAIZ_MAPA_ID);
+        path.style.display = esRaizTecnica ? "none" : "";
+        // Estético: convierte el trazo recto en una curva suave. No se
+        // aplica a los enlaces técnicos ocultos.
+        if (!esRaizTecnica) suavizarTrazoVinculo(path);
       }));
       chart.updateTree({ initial: true, tree_position: "fit", transition_time: 0 });
       if (process.env.NODE_ENV !== "production") {
