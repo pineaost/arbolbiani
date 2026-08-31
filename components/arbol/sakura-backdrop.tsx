@@ -1,6 +1,10 @@
 "use client";
 
-// árbol-biani:sakura-backdrop-depth-v2
+// árbol-biani:sakura-backdrop-depth-v3
+// v3 suma una atmósfera radial muy sutil detrás de las flores y una
+// deriva propia (CSS, no JS) por flor: un movimiento mínimo e
+// independiente del zoom que sólo sugiere que el fondo "respira". La
+// reacción al zoom (deltaZoom / FACTOR_PROFUNDIDAD) sigue intacta.
 // Fondo decorativo del Árbol. Mantiene la forma aprobada de cinco círculos
 // (sin curvas, degradados ni blur) y suma variedad orgánica de tamaño,
 // color y profundidad. La reacción al zoom es deliberadamente mínima: sólo
@@ -92,32 +96,48 @@ export function SakuraBackdrop({ escala = null }: SakuraBackdropProps) {
   }, [escala]);
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+    <div className="sakura-backdrop-atmosfera pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
       {flores.map((flor, indice) => {
         const escalaFlor = limitar(1 + deltaZoom * FACTOR_PROFUNDIDAD[flor.capa], 0.9, 1.14);
+        // Duración/demora determinísticas (no aleatorias) según el índice,
+        // para que cada flor derive a su propio ritmo sin sincronizarse con
+        // las demás. Sólo mueve la envoltura; el <svg> interno conserva su
+        // propio transform para la reacción al zoom, sin conflicto entre los dos.
+        const duracionDeriva = 13 + (indice % 5) * 2.4;
+        const demoraDeriva = -(indice % 7) * 1.7;
         return (
-          <svg
+          <div
             key={indice}
-            viewBox="0 0 40 40"
-            className={`absolute ${CLASE_COLOR[flor.color]}`}
+            className="sakura-flor-deriva absolute"
             style={{
               left: flor.izquierda,
               top: flor.arriba,
               width: flor.tamano,
               height: flor.tamano,
-              opacity: flor.opacidad,
-              transform: `rotate(${flor.rotacion}deg) scale(${escalaFlor})`,
-              transition: "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+              animationDuration: `${duracionDeriva}s`,
+              animationDelay: `${demoraDeriva}s`,
             }}
           >
-            <g fill="currentColor">
-              <circle cx="20" cy="10" r="8" />
-              <circle cx="28" cy="16" r="8" />
-              <circle cx="25" cy="26" r="8" />
-              <circle cx="15" cy="26" r="8" />
-              <circle cx="12" cy="16" r="8" />
-            </g>
-          </svg>
+            <svg
+              viewBox="0 0 40 40"
+              className={CLASE_COLOR[flor.color]}
+              style={{
+                width: "100%",
+                height: "100%",
+                opacity: flor.opacidad,
+                transform: `rotate(${flor.rotacion}deg) scale(${escalaFlor})`,
+                transition: "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+              }}
+            >
+              <g fill="currentColor">
+                <circle cx="20" cy="10" r="8" />
+                <circle cx="28" cy="16" r="8" />
+                <circle cx="25" cy="26" r="8" />
+                <circle cx="15" cy="26" r="8" />
+                <circle cx="12" cy="16" r="8" />
+              </g>
+            </svg>
+          </div>
         );
       })}
     </div>
