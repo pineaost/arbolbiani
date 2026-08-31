@@ -98,10 +98,7 @@ body { @apply bg-background text-ink font-body antialiased; }
 .arbol-control:hover, .arbol-control:focus-visible { background: rgb(var(--sakura-petal)); color: rgb(var(--sakura-plum)); outline: none; }
 .arbol-mapa + div, .arbol-mapa ~ aside { border-color: rgb(var(--sakura-line)) !important; background: rgb(var(--sakura-paper)) !important; box-shadow: var(--sakura-shadow-float) !important; backdrop-filter: none !important; }
 
-/* árbol-biani:sidebar-y-fondo-v1 */
-/* Sidebar: panel con más presencia (gradiente lavanda) + sakura gráfica
-   estática detrás de la navegación. Todo el contenido interactivo va con
-   z-10 para no perder legibilidad ni foco. */
+/* Sidebar: panel lavanda + sakura gráfica estática detrás de la navegación. */
 .sidebar-sakura-panel {
   position: relative;
   background: linear-gradient(165deg, rgb(var(--sakura-lavender) / 0.9) 0%, rgb(var(--sakura-canvas)) 62%);
@@ -109,34 +106,21 @@ body { @apply bg-background text-ink font-body antialiased; }
 .sidebar-sakura-decor {
   position: absolute; inset: 0; z-index: 0;
   width: 100%; height: 100%;
-  opacity: 0.5;
+  opacity: 0.58;
   pointer-events: none;
   mask-image: linear-gradient(180deg, transparent 0%, black 14%, black 82%, transparent 100%);
 }
-.sidebar-sakura-rama { stroke: rgb(var(--sakura-branch) / 0.4); stroke-width: 1.4px; stroke-linecap: round; }
-.sidebar-sakura-flor-a, .sidebar-sakura-flor-c, .sidebar-sakura-flor-e { color: rgb(var(--sakura-bloom)); }
-.sidebar-sakura-flor-b, .sidebar-sakura-flor-f { color: rgb(var(--sakura-blush)); }
-.sidebar-sakura-flor-d, .sidebar-sakura-flor-g { color: rgb(var(--sakura-rose) / 0.75); }
+.sidebar-sakura-rama { stroke: rgb(var(--sakura-plum) / 0.18); stroke-width: 1.2px; stroke-linecap: round; }
+.sidebar-sakura-ramita { stroke: rgb(var(--sakura-plum) / 0.14); stroke-width: 0.95px; stroke-linecap: round; }
+.sidebar-sakura-flor-rosa { color: rgb(var(--sakura-bloom) / 0.86); }
+.sidebar-sakura-flor-lavanda { color: rgb(var(--sakura-lavender) / 0.96); }
+.sidebar-sakura-flor-gris { color: rgb(var(--sakura-plum) / 0.22); }
 
-/* Fondo del Árbol: atmósfera radial muy sutil + deriva propia por flor.
-   No interfiere con la reacción al zoom que ya maneja cada <svg>: la
-   deriva anima sólo la envoltura, en un plano de transformación distinto. */
+/* Fondo del Árbol: atmósfera y motivos completamente estáticos. */
 .sakura-backdrop-atmosfera {
   background:
     radial-gradient(120% 85% at 18% 8%, rgb(var(--sakura-lavender) / 0.35) 0%, transparent 55%),
     radial-gradient(110% 90% at 85% 92%, rgb(var(--sakura-blush) / 0.28) 0%, transparent 60%);
-}
-@keyframes sakura-flor-deriva {
-  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  50% { transform: translate3d(1.5px, -2.5px, 0) rotate(0.6deg); }
-  100% { transform: translate3d(-1.5px, 1.5px, 0) rotate(-0.6deg); }
-}
-.sakura-flor-deriva {
-  animation-name: sakura-flor-deriva;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  animation-direction: alternate;
-  will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {

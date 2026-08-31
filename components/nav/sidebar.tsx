@@ -7,40 +7,50 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { navLinks } from "./nav-links";
 
-// árbol-biani:sidebar-sakura-v1
-// Decoración gráfica y estática (sin animación) del sidebar: una rama y
-// pétalos de sakura usando la misma forma de cinco círculos superpuestos
-// ya validada en el fondo del Árbol. Vive detrás del contenido (z-0); no
-// participa de la navegación ni de ninguna lógica.
+// Decoración gráfica y estática del sidebar. Vive detrás del contenido y
+// usa exclusivamente la paleta Sakura compartida; no participa de la
+// navegación ni de ninguna lógica.
 function SidebarSakuraDecor() {
   return (
     <svg
-      viewBox="0 0 224 640"
+      viewBox="0 0 224 800"
       preserveAspectRatio="xMidYMid slice"
       className="sidebar-sakura-decor"
       aria-hidden="true"
     >
       <defs>
-        <g id="sidebar-sakura-petalo">
+        <g id="sidebar-sakura-flor" fill="currentColor">
           <circle cx="20" cy="10" r="8" />
           <circle cx="28" cy="16" r="8" />
           <circle cx="25" cy="26" r="8" />
           <circle cx="15" cy="26" r="8" />
           <circle cx="12" cy="16" r="8" />
         </g>
+        <ellipse id="sidebar-sakura-petalo" cx="0" cy="0" rx="3" ry="7" fill="currentColor" />
       </defs>
       <path
-        d="M204 30 C 182 96, 214 168, 190 240 C 170 300, 202 366, 182 432 C 166 486, 196 546, 176 610"
+        d="M118 -20 C 103 48, 128 104, 110 166 C 96 218, 120 276, 106 334 C 92 390, 115 454, 101 516 C 88 575, 111 649, 96 820"
         className="sidebar-sakura-rama"
         fill="none"
       />
-      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor sidebar-sakura-flor-a" transform="translate(176,58) scale(0.85)" />
-      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor sidebar-sakura-flor-b" transform="translate(150,140) scale(0.6) rotate(18)" />
-      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor sidebar-sakura-flor-c" transform="translate(196,236) scale(1.05) rotate(-12)" />
-      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor sidebar-sakura-flor-d" transform="translate(158,318) scale(0.5) rotate(8)" />
-      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor sidebar-sakura-flor-e" transform="translate(188,420) scale(0.8) rotate(-20)" />
-      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor sidebar-sakura-flor-f" transform="translate(150,498) scale(0.55) rotate(14)" />
-      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor sidebar-sakura-flor-g" transform="translate(182,588) scale(0.7) rotate(-6)" />
+      <path d="M110 166 C 88 146, 68 139, 45 141 M106 334 C 134 310, 158 303, 184 307 M101 516 C 78 495, 54 490, 29 496 M99 635 C 126 610, 151 606, 178 617" className="sidebar-sakura-ramita" fill="none" />
+
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-rosa" transform="translate(17,120) scale(0.54) rotate(-12)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-lavanda" transform="translate(45,133) scale(0.72) rotate(10)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-gris" transform="translate(106,78) scale(0.5) rotate(-18)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-rosa" transform="translate(149,283) scale(0.66) rotate(14)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-lavanda" transform="translate(177,294) scale(0.48) rotate(-8)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-gris" transform="translate(83,330) scale(0.48) rotate(18)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-rosa" transform="translate(15,469) scale(0.68) rotate(-16)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-lavanda" transform="translate(55,492) scale(0.46) rotate(9)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-gris" transform="translate(137,592) scale(0.54) rotate(-10)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-rosa" transform="translate(174,607) scale(0.68) rotate(14)" />
+      <use href="#sidebar-sakura-flor" className="sidebar-sakura-flor-lavanda" transform="translate(83,702) scale(0.5) rotate(-16)" />
+
+      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor-rosa" transform="translate(36,254) rotate(34)" />
+      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor-lavanda" transform="translate(181,414) rotate(-28) scale(0.82)" />
+      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor-gris" transform="translate(63,620) rotate(22) scale(0.76)" />
+      <use href="#sidebar-sakura-petalo" className="sidebar-sakura-flor-rosa" transform="translate(161,748) rotate(42) scale(0.86)" />
     </svg>
   );
 }
