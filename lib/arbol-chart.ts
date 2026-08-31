@@ -2,6 +2,16 @@ import type { PersonaArbol } from "@/lib/supabase/types";
 
 export const RAIZ_MAPA_ID = "__arbol_mapa_raiz__";
 
+// Única fuente de dimensiones para el DOM de las fichas y el cálculo de
+// posiciones de family-chart. Las separaciones conservan aire suficiente
+// alrededor de tarjetas con nombres de hasta dos líneas.
+export const GEOMETRIA_ARBOL = {
+  anchoNodo: 176,
+  altoNodo: 92,
+  separacionHorizontal: 216,
+  separacionVertical: 148,
+} as const;
+
 export interface DatoFamilyChart {
   id: string;
   data: { gender: "M" | "F"; nombre?: string; apellido?: string; anios?: string; iniciales?: string; orden: string; virtual?: boolean; sinLineaSangre?: boolean; sinGeneroDefinido?: boolean };

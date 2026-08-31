@@ -32,8 +32,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push("/arbol");
-    router.refresh();
+    router.replace("/arbol");
   }
 
   return (

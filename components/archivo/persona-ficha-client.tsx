@@ -209,7 +209,7 @@ export function PersonaFichaClient({ persona, personas, enDrawer = false, onCerr
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-5 py-7 sm:px-6 md:py-10">
+    <div className="mx-auto max-w-4xl px-5 py-7 sm:px-6 md:py-10">
       {!enDrawer && <Link href="/archivo" className="mb-6 inline-flex items-center gap-1.5 text-sm text-ink/60 transition-colors hover:text-velvet">
         <ArrowLeft size={16} /> Volver al Archivo Familiar
       </Link>}
@@ -323,7 +323,7 @@ export function PersonaFichaClient({ persona, personas, enDrawer = false, onCerr
       {confirmacion && <ConfirmDialog abierto titulo={confirmacion.titulo} descripcion={confirmacion.descripcion} confirmar={confirmacion.confirmar} pendiente={pendiente} onCancelar={() => setConfirmacion(null)} onConfirmar={confirmarEliminacion} />}
       {aviso && <NoticeDialog abierto titulo={aviso.titulo} mensaje={aviso.mensaje} pendiente={pendiente} onCerrar={() => setAviso(null)} accionDestructiva={aviso.permiteEliminacionForzada ? { etiqueta: "Eliminar", onAccionar: confirmarEliminacionForzada } : undefined} />}
       {editandoDatos && <PersonaModal persona={persona} onCerrar={() => setEditandoDatos(false)} onGuardado={() => { router.refresh(); void onActualizarFicha?.(); }} />}
-    </main>
+    </div>
   );
 }
 

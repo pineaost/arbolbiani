@@ -11,9 +11,11 @@ Next.js (App Router) · React · TypeScript · Tailwind CSS · Supabase (Postgre
 
 ```
 app/                  rutas (App Router)
-  arbol/               pantalla principal — mapa navegable
-  archivo/              administración: alta/baja/edición
-  bitacora/             cuaderno de investigación
+  (app)/                layout autenticado con navegación compartida
+    arbol/               pantalla principal — mapa navegable
+    archivo/             administración: alta/baja/edición
+    bitacora/            cuaderno de investigación
+  login/                acceso sin navegación de la aplicación
 components/nav/        sidebar (desktop) y barra inferior (mobile)
 lib/
   supabase/            clientes de Supabase (browser y server)

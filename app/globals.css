@@ -20,7 +20,7 @@
   --sakura-line: 231 220 227;
   --sakura-branch: 118 109 105;
   --sakura-vinculo: 131 109 110;
-  --sakura-masculino: 89 117 145;
+  --sakura-masculino: 91 139 178;
   --sakura-femenino: 201 132 149;
   --sakura-indefinido: 155 150 153;
   --sakura-confirmada: 78 123 96;
@@ -62,11 +62,12 @@ body { @apply bg-background text-ink font-body antialiased; }
 .arbol-mapa path.link { fill: none; stroke: rgb(var(--sakura-vinculo)); stroke-width: 1.6px; stroke-linecap: round; stroke-linejoin: round; opacity: 0.76; transition: stroke 200ms ease; }
 .arbol-mapa .card_cont { pointer-events: none; }
 .arbol-mapa .card-inner, .arbol-mapa .card_cont .card { pointer-events: auto; }
-.arbol-mapa .card-inner { width: 164px; height: 76px; overflow: visible; background: transparent; }
+.arbol-mapa .card-inner { width: var(--arbol-nodo-ancho); height: var(--arbol-nodo-alto); overflow: visible; background: transparent; }
 .arbol-mapa .card-rect, .arbol-mapa .card-body-rect, .arbol-mapa .text-overflow-mask { display: none; }
 
 .arbol-nodo {
-  display: flex; width: 164px; min-height: 76px; cursor: pointer;
+  display: flex; width: var(--arbol-nodo-ancho); min-height: var(--arbol-nodo-alto); cursor: pointer;
+  box-sizing: border-box;
   flex-direction: column; justify-content: center;
   --halo: var(--sakura-indefinido);
   border: 1px solid rgb(var(--sakura-line)); border-left: 4px solid var(--genderless-color);
@@ -81,7 +82,12 @@ body { @apply bg-background text-ink font-body antialiased; }
 .arbol-mapa .arbol-nodo-sin-linea-sangre { border-color: rgb(var(--sakura-line)); border-left-color: rgb(var(--sakura-branch)); background: rgb(var(--sakura-paper) / 0.92); box-shadow: 0 6px 16px -11px rgb(var(--sakura-branch) / 0.3); }
 .arbol-nodo:hover, .arbol-nodo:focus-visible { border-color: rgb(var(--sakura-rose)); box-shadow: var(--sakura-shadow-card-hover), 0 0 0 1px rgb(var(--halo) / 0.24), 0 14px 26px -16px rgb(var(--halo) / 0.52); outline: none; transform: translateY(-2px); }
 .arbol-nodo-seleccionado { border: 2px solid rgb(var(--sakura-plum)); border-left: 6px solid rgb(var(--sakura-plum)) !important; background: rgb(var(--sakura-petal)); box-shadow: 0 0 0 4px rgb(var(--sakura-bloom) / 0.55), 0 14px 28px -10px rgb(var(--sakura-plum) / 0.4); }
-.arbol-nodo-nombre { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display), system-ui, sans-serif; font-size: 15px; font-weight: 700; line-height: 1.22; color: rgb(var(--sakura-plum)); }
+.arbol-nodo-nombre {
+  display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  white-space: normal; overflow-wrap: normal; word-break: normal; hyphens: none;
+  font-family: var(--font-display), system-ui, sans-serif; font-size: 15px; font-weight: 700; line-height: 1.24;
+  color: rgb(var(--sakura-plum));
+}
 .arbol-nodo-anios { margin-top: 4px; font-size: 12px; line-height: 1.15; color: rgb(var(--sakura-muted)); }
 .arbol-zoom-lejos .arbol-nodo { min-height: 42px; padding: 7px 9px; border-left-width: 3px; border-radius: 9px; }
 .arbol-zoom-lejos .arbol-nodo-nombre, .arbol-zoom-lejos .arbol-nodo-anios { display: none; }

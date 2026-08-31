@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { Minus, Move, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { SakuraBackdrop } from "@/components/arbol/sakura-backdrop";
-import { compararHijosParaLayout, crearDatosFamilyChart, diagnosticarDatosFamilyChart, ordenarConyugesParaLayout, RAIZ_MAPA_ID } from "@/lib/arbol-chart";
+import { compararHijosParaLayout, crearDatosFamilyChart, diagnosticarDatosFamilyChart, GEOMETRIA_ARBOL, ordenarConyugesParaLayout, RAIZ_MAPA_ID } from "@/lib/arbol-chart";
 import type { PersonaArbol } from "@/lib/supabase/types";
 
 type FamilyChart = ReturnType<(typeof import("family-chart"))["createChart"]>;
@@ -15,6 +16,11 @@ function nombreCompleto(persona: PersonaArbol) { return `${persona.nombre} ${per
 function anios(persona: PersonaArbol) { return [persona.fecha_nacimiento?.slice(0, 4), persona.fecha_fallecimiento?.slice(0, 4)].filter(Boolean).join(" — "); }
 function lugarPrincipal(persona: PersonaArbol) { return persona.lugar_nacimiento ?? persona.lugar_fallecimiento ?? null; }
 function escaparHtml(valor: unknown) { return String(valor ?? "").replace(/[&<>'"]/g, (caracter) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[caracter] ?? caracter); }
+
+const variablesGeometriaArbol = {
+  "--arbol-nodo-ancho": `${GEOMETRIA_ARBOL.anchoNodo}px`,
+  "--arbol-nodo-alto": `${GEOMETRIA_ARBOL.altoNodo}px`,
+} as CSSProperties;
 
 // Convierte el trazo recto/ortogonal que entrega family-chart en una curva
 // suave tipo d3.linkVertical: mismos puntos de entrada y salida, con un
@@ -90,17 +96,21 @@ export function ArbolClient({ personas }: Props) {
       // La librería muta su entrada durante el cálculo; cada montaje recibe una copia.
       const chart = f3.createChart(actual, structuredClone(datosChart))
         .setOrientationVertical().setSingleParentEmptyCard(false).setShowSiblingsOfMain(false)
-        .setAncestryDepth(99).setProgenyDepth(99).setCardXSpacing(202).setCardYSpacing(128).setTransitionTime(0)
+        .setAncestryDepth(99).setProgenyDepth(99)
+        .setCardXSpacing(GEOMETRIA_ARBOL.separacionHorizontal)
+        .setCardYSpacing(GEOMETRIA_ARBOL.separacionVertical)
+        .setTransitionTime(0)
         .setSortChildrenFunction(compararHijosParaLayout)
         .setSortSpousesFunction(ordenarConyugesParaLayout);
-      chart.setCardHtml().setStyle("rect").setCardDim({ w: 164, h: 76 }).setCardInnerHtmlCreator((datum) => {
+      chart.setCardHtml().setStyle("rect").setCardDim({ w: GEOMETRIA_ARBOL.anchoNodo, h: GEOMETRIA_ARBOL.altoNodo }).setCardInnerHtmlCreator((datum) => {
         if (datum.data.id === RAIZ_MAPA_ID) return '<div class="arbol-raiz-tecnica" aria-hidden="true"></div>';
         const datosPersona = datum.data.data;
         const nombre = datosPersona.nombre ?? "";
         const apellido = datosPersona.apellido ?? "";
+        const nombrePersona = `${nombre} ${apellido}`.trim();
         const claseLineaSangre = datosPersona.sinLineaSangre ? " arbol-nodo-sin-linea-sangre" : "";
         const claseGenero = datosPersona.sinGeneroDefinido ? " arbol-nodo-sin-genero" : "";
-        return `<div class="arbol-nodo${claseLineaSangre}${claseGenero}" data-persona-id="${escaparHtml(datum.data.id)}" role="button" tabindex="0" aria-label="Abrir ficha de ${escaparHtml(`${nombre} ${apellido}`)}"><span class="arbol-nodo-nombre">${escaparHtml(nombre)} ${escaparHtml(apellido)}</span>${datosPersona.anios ? `<span class="arbol-nodo-anios">${escaparHtml(datosPersona.anios)}</span>` : ""}</div>`;
+        return `<div class="arbol-nodo${claseLineaSangre}${claseGenero}" data-persona-id="${escaparHtml(datum.data.id)}" role="button" tabindex="0" aria-label="Abrir ficha de ${escaparHtml(nombrePersona)}" title="${escaparHtml(nombrePersona)}"><span class="arbol-nodo-nombre">${escaparHtml(nombrePersona)}</span>${datosPersona.anios ? `<span class="arbol-nodo-anios">${escaparHtml(datosPersona.anios)}</span>` : ""}</div>`;
       }).setOnCardClick((_event: MouseEvent, datum: { data: { id: string } }) => { if (datum.data.id !== RAIZ_MAPA_ID) setPersonaSeleccionadaId(datum.data.id); });
       chart.setAfterUpdate(() => actual.querySelectorAll<SVGPathElement>("path.link").forEach((path) => {
         // Sólo se ocultan los enlaces creados por la raíz de layout. El
@@ -173,8 +183,8 @@ export function ArbolClient({ personas }: Props) {
     contenedor?.querySelectorAll<HTMLElement>("[data-persona-id]").forEach((nodo) => nodo.classList.toggle("arbol-nodo-seleccionado", nodo.dataset.personaId === personaSeleccionadaId));
   }, [personaSeleccionadaId, detalleZoom]);
 
-  if (personas.length === 0) return <main className="flex min-h-[calc(100svh-4rem)] items-center justify-center px-6 md:min-h-screen"><div className="max-w-sm text-center"><h1 className="font-display text-3xl text-velvet">Árbol</h1><p className="mt-3 text-sm leading-6 text-ink/60">Cuando haya personas cargadas, el mapa familiar aparecerá acá.</p><Link href="/archivo" className="mt-5 inline-flex text-sm text-velvet underline underline-offset-4">Ir al Archivo Familiar</Link></div></main>;
-  return <main className="relative h-[calc(100svh-4rem)] overflow-hidden bg-background md:h-screen"><SakuraBackdrop escala={escalaZoom} /><div className={`arbol-mapa f3 arbol-zoom-${detalleZoom}`} ref={contenedorRef} aria-label="Mapa interactivo del árbol genealógico" /><div className="absolute right-4 top-4 z-10 flex overflow-hidden rounded-xl border border-border bg-white/95 shadow-soft backdrop-blur-sm sm:right-6 sm:top-6"><button type="button" onClick={() => modificarZoom(1.22)} className="arbol-control" aria-label="Acercar"><Plus size={18} /></button><button type="button" onClick={() => modificarZoom(0.82)} className="arbol-control border-x border-border" aria-label="Alejar"><Minus size={18} /></button><button type="button" onClick={ajustarVistaCompleta} className="arbol-control gap-1.5 px-3 text-xs font-medium" aria-label="Ver todo el árbol"><Move size={16} /> <span className="hidden sm:inline">Ver todo</span></button></div>{personaSeleccionada && <aside className="absolute inset-x-3 bottom-3 z-10 max-h-[62vh] overflow-y-auto rounded-2xl border border-border bg-white/95 p-5 shadow-[0_16px_42px_-18px_rgba(36,26,51,0.35)] backdrop-blur-sm sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-80"><div className="flex items-start justify-between gap-4"><div><h2 className="font-display text-2xl leading-tight text-velvet">{nombreCompleto(personaSeleccionada)}</h2></div><button type="button" onClick={() => setPersonaSeleccionadaId(null)} className="rounded-lg p-1 text-ink/45 transition-colors hover:bg-lavender/30 hover:text-velvet" aria-label="Cerrar ficha"><X size={18} /></button></div>{(anios(personaSeleccionada) || lugarPrincipal(personaSeleccionada)) && <p className="mt-3 text-sm leading-6 text-ink/65">{[anios(personaSeleccionada), lugarPrincipal(personaSeleccionada)].filter(Boolean).join(" · ")}</p>}<div className="mt-5 space-y-4 border-t border-border pt-4"><GrupoPersonas etiqueta="Padres / madres" ids={personaSeleccionada.padres_ids} personas={personaPorId} onElegir={centrarEnPersona} /><GrupoPersonas etiqueta="Hijos / hijas" ids={personaSeleccionada.hijos_ids} personas={personaPorId} onElegir={centrarEnPersona} /><GrupoPersonas etiqueta="Cónyuges / parejas" ids={personaSeleccionada.conyuges_ids} personas={personaPorId} onElegir={centrarEnPersona} /><GrupoPersonas etiqueta="Hermanos / hermanas" ids={personaSeleccionada.hermanos_ids} personas={personaPorId} onElegir={centrarEnPersona} /></div><Link href={`/archivo/${personaSeleccionada.id}`} className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-velvet px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90">Editar en Archivo Familiar</Link></aside>}</main>;
+  if (personas.length === 0) return <div className="flex min-h-[calc(100svh-4rem)] items-center justify-center px-6 md:min-h-screen"><div className="max-w-sm text-center"><h1 className="font-display text-3xl text-velvet">Árbol</h1><p className="mt-3 text-sm leading-6 text-ink/60">Cuando haya personas cargadas, el mapa familiar aparecerá acá.</p><Link href="/archivo" className="mt-5 inline-flex text-sm text-velvet underline underline-offset-4">Ir al Archivo Familiar</Link></div></div>;
+  return <div className="relative h-[calc(100svh-4rem)] overflow-hidden bg-background md:h-screen"><SakuraBackdrop escala={escalaZoom} /><div className={`arbol-mapa f3 arbol-zoom-${detalleZoom}`} ref={contenedorRef} style={variablesGeometriaArbol} aria-label="Mapa interactivo del árbol genealógico" /><div className="absolute right-4 top-4 z-10 flex overflow-hidden rounded-xl border border-border bg-white/95 shadow-soft backdrop-blur-sm sm:right-6 sm:top-6"><button type="button" onClick={() => modificarZoom(1.22)} className="arbol-control" aria-label="Acercar"><Plus size={18} /></button><button type="button" onClick={() => modificarZoom(0.82)} className="arbol-control border-x border-border" aria-label="Alejar"><Minus size={18} /></button><button type="button" onClick={ajustarVistaCompleta} className="arbol-control gap-1.5 px-3 text-xs font-medium" aria-label="Ver todo el árbol"><Move size={16} /> <span className="hidden sm:inline">Ver todo</span></button></div>{personaSeleccionada && <aside className="absolute inset-x-3 bottom-3 z-10 max-h-[62vh] overflow-y-auto rounded-2xl border border-border bg-white/95 p-5 shadow-[0_16px_42px_-18px_rgba(36,26,51,0.35)] backdrop-blur-sm sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-80"><div className="flex items-start justify-between gap-4"><div><h2 className="font-display text-2xl leading-tight text-velvet">{nombreCompleto(personaSeleccionada)}</h2></div><button type="button" onClick={() => setPersonaSeleccionadaId(null)} className="rounded-lg p-1 text-ink/45 transition-colors hover:bg-lavender/30 hover:text-velvet" aria-label="Cerrar ficha"><X size={18} /></button></div>{(anios(personaSeleccionada) || lugarPrincipal(personaSeleccionada)) && <p className="mt-3 text-sm leading-6 text-ink/65">{[anios(personaSeleccionada), lugarPrincipal(personaSeleccionada)].filter(Boolean).join(" · ")}</p>}<div className="mt-5 space-y-4 border-t border-border pt-4"><GrupoPersonas etiqueta="Padres / madres" ids={personaSeleccionada.padres_ids} personas={personaPorId} onElegir={centrarEnPersona} /><GrupoPersonas etiqueta="Hijos / hijas" ids={personaSeleccionada.hijos_ids} personas={personaPorId} onElegir={centrarEnPersona} /><GrupoPersonas etiqueta="Cónyuges / parejas" ids={personaSeleccionada.conyuges_ids} personas={personaPorId} onElegir={centrarEnPersona} /><GrupoPersonas etiqueta="Hermanos / hermanas" ids={personaSeleccionada.hermanos_ids} personas={personaPorId} onElegir={centrarEnPersona} /></div><Link href={`/archivo/${personaSeleccionada.id}`} className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-velvet px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90">Editar en Archivo Familiar</Link></aside>}</div>;
 }
 
 function GrupoPersonas({ etiqueta, ids, personas, onElegir }: { etiqueta: string; ids: string[]; personas: Map<string, PersonaArbol>; onElegir: (id: string) => void }) {

@@ -33,7 +33,7 @@ function cargarModulo(archivoRelativo, dependencias = {}) {
   return modulo.exports;
 }
 
-const { compararHijosParaLayout, crearDatosFamilyChart, crearModeloArbol, diagnosticarDatosFamilyChart, ordenarConyugesParaLayout, RAIZ_MAPA_ID } = cargarTransformador();
+const { compararHijosParaLayout, crearDatosFamilyChart, crearModeloArbol, diagnosticarDatosFamilyChart, GEOMETRIA_ARBOL, ordenarConyugesParaLayout, RAIZ_MAPA_ID } = cargarTransformador();
 
 function persona(id, { padres = [], hijos = [], conyuges = [], nacimiento = "1950-01-01" } = {}) {
   return {
@@ -72,6 +72,8 @@ function calcularArbol(datos) {
     single_parent_empty_card: false,
     ancestry_depth: 99,
     progeny_depth: 99,
+    node_separation: GEOMETRIA_ARBOL.separacionHorizontal,
+    level_separation: GEOMETRIA_ARBOL.separacionVertical,
     sortChildrenFunction: compararHijosParaLayout,
     sortSpousesFunction: ordenarConyugesParaLayout,
   });
@@ -379,4 +381,32 @@ test("el orden horizontal conserva a cuatro hermanos consecutivos y deja la pare
   assert.deepEqual(fila, ["hermana-mayor", "hermana-menor", "hermano-menor", "hermano-con-pareja", "pareja-sin-filiacion"]);
   assert.equal(datos.find((dato) => dato.id === "pareja-sin-filiacion")?.data.sinLineaSangre, true);
   assert.equal(datos.find((dato) => dato.id === "hermano-con-pareja")?.data.sinLineaSangre, false);
+});
+
+test("la geometría ampliada evita solapamientos entre padres, hijos, hermanos y parejas", () => {
+  const personas = [
+    persona("padre", { hijos: ["hija-uno", "hijo-dos", "hija-tres"], conyuges: ["madre"], nacimiento: "1945-01-01" }),
+    persona("madre", { hijos: ["hija-uno", "hijo-dos", "hija-tres"], conyuges: ["padre"], nacimiento: "1948-01-01" }),
+    persona("hija-uno", { padres: ["padre", "madre"], nacimiento: "1970-01-01" }),
+    persona("hijo-dos", { padres: ["padre", "madre"], conyuges: ["pareja"], nacimiento: "1973-01-01" }),
+    persona("pareja", { conyuges: ["hijo-dos"], nacimiento: "1974-01-01" }),
+    persona("hija-tres", { padres: ["padre", "madre"], nacimiento: "1976-01-01" }),
+  ];
+  const nodos = calcularArbol(crearDatosFamilyChart(personas)).data
+    .filter((dato) => dato.data.id !== RAIZ_MAPA_ID);
+
+  for (let indice = 0; indice < nodos.length; indice += 1) {
+    for (let otroIndice = indice + 1; otroIndice < nodos.length; otroIndice += 1) {
+      const primero = nodos[indice];
+      const segundo = nodos[otroIndice];
+      const seSuperponenHorizontalmente = Math.abs(primero.x - segundo.x) < GEOMETRIA_ARBOL.anchoNodo;
+      const seSuperponenVerticalmente = Math.abs(primero.y - segundo.y) < GEOMETRIA_ARBOL.altoNodo;
+
+      assert.equal(
+        seSuperponenHorizontalmente && seSuperponenVerticalmente,
+        false,
+        `${primero.data.id} y ${segundo.data.id} no deben superponerse`,
+      );
+    }
+  }
 });

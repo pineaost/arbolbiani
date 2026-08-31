@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Handlee } from "next/font/google";
-import { AppShell } from "@/components/nav/app-shell";
 import "./globals.css";
 import "family-chart/styles/family-chart.css";
 
@@ -23,9 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className={handlee.variable}>
-        <AppShell>{children}</AppShell>
-      </body>
+      <body className={handlee.variable}>{children}</body>
     </html>
   );
 }
