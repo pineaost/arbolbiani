@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Handlee } from "next/font/google";
+import { Libre_Bodoni } from "next/font/google";
 import "./globals.css";
 import "family-chart/styles/family-chart.css";
 
-const handlee = Handlee({
+const libreBodoni = Libre_Bodoni({
   subsets: ["latin"],
-  weight: "400",
+  weight: "700",
   variable: "--font-brand",
   display: "swap",
 });
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className={handlee.variable}>{children}</body>
+      <body className={libreBodoni.variable}>{children}</body>
     </html>
   );
 }

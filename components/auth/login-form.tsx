@@ -1,43 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useFormState, useFormStatus } from "react-dom";
+import { iniciarSesion } from "@/app/login/actions";
+
+const estadoInicial = { error: null as string | null };
 
 export function LoginForm() {
-  const router = useRouter();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [cargando, setCargando] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    setError(null);
-    setCargando(true);
-
-    const supabase = createClient();
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setCargando(false);
-
-    if (error) {
-      setError("Correo o contraseña incorrectos.");
-      return;
-    }
-
-    router.replace("/arbol");
-  }
+  const [estado, accion] = useFormState(iniciarSesion, estadoInicial);
 
   return (
     <form
-      onSubmit={handleSubmit}
+      action={accion}
       className="flex flex-col gap-4 rounded-2xl border border-border bg-sakura-paper p-6 shadow-sakura-float"
     >
       <div className="flex flex-col gap-1.5">
@@ -47,11 +20,10 @@ export function LoginForm() {
 
         <input
           id="email"
+          name="email"
           type="email"
           required
           autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
           className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-velvet transition-colors"
         />
       </div>
@@ -63,28 +35,36 @@ export function LoginForm() {
 
         <input
           id="password"
+          name="password"
           type="password"
           required
           autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
           className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-velvet transition-colors"
         />
       </div>
 
-      {error && (
-        <p className="text-xs text-estado-incompleta">
-          {error}
+      {estado.error && (
+        <p className="text-xs text-estado-incompleta" role="alert" aria-live="polite">
+          {estado.error}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={cargando}
-        className="mt-2 rounded-xl bg-velvet px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-      >
-        {cargando ? "Entrando..." : "Entrar"}
-      </button>
+      <BotonEntrar />
     </form>
+  );
+}
+
+function BotonEntrar() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      aria-busy={pending}
+      className="mt-2 rounded-xl bg-velvet px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+    >
+      {pending ? "Entrando..." : "Entrar"}
+    </button>
   );
 }
