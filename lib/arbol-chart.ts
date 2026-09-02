@@ -25,6 +25,7 @@ export interface DatoFamilyChart {
     sinGeneroDefinido?: boolean;
     tieneConyuge?: boolean;
     ordenLayout?: number;
+    raizLayoutId?: string;
   };
   rels: { parents: string[]; children: string[]; spouses: string[] };
 }
@@ -69,14 +70,135 @@ export interface BosqueLayoutArbol {
   personaAdjuntaAConyuge: Map<string, string>;
   conyugesAdjuntosPorPersona: Map<string, Set<string>>;
   ordenLayoutPorPersona: Map<string, number>;
+  profundidadObjetivoPorRaiz: Map<string, number>;
   raices: string[];
 }
 
-export interface VinculoVisualArbol {
+export interface VinculoVisualConyugalArbol {
   id: string;
-  tipo: "filiacion" | "conyugal";
+  tipo: "conyugal";
   origenId: string;
   destinoId: string;
+}
+
+export interface VinculoVisualUnionFamiliarArbol {
+  id: string;
+  tipo: "union-familiar";
+  familiaId: string;
+  progenitoresIds: string[];
+  hijosIds: string[];
+}
+
+export type VinculoVisualArbol = VinculoVisualConyugalArbol | VinculoVisualUnionFamiliarArbol;
+
+export interface NodoPosicionadoArbol {
+  data: { id: string; data?: { virtual?: boolean } };
+  x: number;
+  y: number;
+}
+
+export interface TrazoVinculoArbol {
+  d: string;
+  modo: "curva" | "bus" | "individual";
+  degradado: boolean;
+}
+
+function numeroSvg(valor: number) {
+  return String(Math.round(valor * 1000) / 1000);
+}
+
+function puntoEnBorde(origen: NodoPosicionadoArbol, destino: NodoPosicionadoArbol) {
+  const dx = destino.x - origen.x;
+  const dy = destino.y - origen.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return { x: origen.x + Math.sign(dx || 1) * GEOMETRIA_ARBOL.anchoNodo / 2, y: origen.y };
+  }
+  return { x: origen.x, y: origen.y + Math.sign(dy || 1) * GEOMETRIA_ARBOL.altoNodo / 2 };
+}
+
+function curvaEntrePuntos(inicio: { x: number; y: number }, fin: { x: number; y: number }) {
+  const yMedio = (inicio.y + fin.y) / 2;
+  return `M${numeroSvg(inicio.x)},${numeroSvg(inicio.y)} C${numeroSvg(inicio.x)},${numeroSvg(yMedio)} ${numeroSvg(fin.x)},${numeroSvg(yMedio)} ${numeroSvg(fin.x)},${numeroSvg(fin.y)}`;
+}
+
+function hijosContiguosEnLayout(hijos: NodoPosicionadoArbol[], nodos: NodoPosicionadoArbol[]) {
+  if (hijos.length < 2) return true;
+  const yFila = hijos[0].y;
+  if (hijos.some((hijo) => Math.abs(hijo.y - yFila) > 1)) return false;
+  const idsHijos = new Set(hijos.map(({ data }) => data.id));
+  const fila = nodos
+    .filter((nodo) => !nodo.data.data?.virtual && Math.abs(nodo.y - yFila) <= 1)
+    .sort((a, b) => a.x - b.x || a.data.id.localeCompare(b.data.id, "es"));
+  const posiciones = fila
+    .map((nodo, indice) => idsHijos.has(nodo.data.id) ? indice : -1)
+    .filter((indice) => indice >= 0);
+  return posiciones.length === hijos.length
+    && Math.max(...posiciones) - Math.min(...posiciones) + 1 === hijos.length;
+}
+
+/**
+ * Calcula el path SVG a partir de las coordenadas reales de family-chart.
+ * Una union no contigua conserva su semantica degradando a una curva por hijo.
+ */
+export function crearTrazoVinculoArbol(
+  vinculo: VinculoVisualArbol,
+  nodos: NodoPosicionadoArbol[],
+): TrazoVinculoArbol | null {
+  const nodosPorId = new Map(nodos.map((nodo) => [nodo.data.id, nodo]));
+  if (vinculo.tipo === "conyugal") {
+    const origen = nodosPorId.get(vinculo.origenId);
+    const destino = nodosPorId.get(vinculo.destinoId);
+    if (!origen || !destino) return null;
+    const inicio = puntoEnBorde(origen, destino);
+    const fin = puntoEnBorde(destino, origen);
+    if (Math.abs(inicio.x - fin.x) >= Math.abs(inicio.y - fin.y)) {
+      const xMedio = (inicio.x + fin.x) / 2;
+      return {
+        d: `M${numeroSvg(inicio.x)},${numeroSvg(inicio.y)} C${numeroSvg(xMedio)},${numeroSvg(inicio.y)} ${numeroSvg(xMedio)},${numeroSvg(fin.y)} ${numeroSvg(fin.x)},${numeroSvg(fin.y)}`,
+        modo: "curva",
+        degradado: false,
+      };
+    }
+    return { d: curvaEntrePuntos(inicio, fin), modo: "curva", degradado: false };
+  }
+
+  const progenitores = vinculo.progenitoresIds
+    .map((id) => nodosPorId.get(id))
+    .filter((nodo): nodo is NodoPosicionadoArbol => !!nodo);
+  const hijos = vinculo.hijosIds
+    .map((id) => nodosPorId.get(id))
+    .filter((nodo): nodo is NodoPosicionadoArbol => !!nodo);
+  if (progenitores.length !== vinculo.progenitoresIds.length || hijos.length !== vinculo.hijosIds.length || hijos.length === 0) {
+    return null;
+  }
+
+  const ancla = progenitores.length === 1
+    ? { x: progenitores[0].x, y: progenitores[0].y + GEOMETRIA_ARBOL.altoNodo / 2 }
+    : {
+      x: progenitores.reduce((total, nodo) => total + nodo.x, 0) / progenitores.length,
+      y: progenitores.reduce((total, nodo) => total + nodo.y, 0) / progenitores.length,
+    };
+  const finHijo = (hijo: NodoPosicionadoArbol) => ({ x: hijo.x, y: hijo.y - GEOMETRIA_ARBOL.altoNodo / 2 });
+
+  if (!hijosContiguosEnLayout(hijos, nodos)) {
+    return {
+      d: hijos.map((hijo) => curvaEntrePuntos(ancla, finHijo(hijo))).join(" "),
+      modo: "individual",
+      degradado: true,
+    };
+  }
+
+  const extremos = hijos.map((hijo) => finHijo(hijo));
+  const xMinimo = Math.min(...extremos.map(({ x }) => x));
+  const xMaximo = Math.max(...extremos.map(({ x }) => x));
+  const ySuperiorHijos = Math.min(...extremos.map(({ y }) => y));
+  const yBus = ancla.y + (ySuperiorHijos - ancla.y) / 2;
+  const tramos = [
+    `M${numeroSvg(ancla.x)},${numeroSvg(ancla.y)} V${numeroSvg(yBus)}`,
+    `M${numeroSvg(xMinimo)},${numeroSvg(yBus)} H${numeroSvg(xMaximo)}`,
+    ...extremos.map((fin) => `M${numeroSvg(fin.x)},${numeroSvg(yBus)} V${numeroSvg(fin.y)}`),
+  ];
+  return { d: tramos.join(" "), modo: "bus", degradado: false };
 }
 
 // Superconjunto minimo compatible tanto con DatoFamilyChart como con Datum
@@ -509,6 +631,45 @@ function ordenarHijosPorConectividad(
   }
 }
 
+function calcularProfundidadesRelativasBosque(
+  raices: string[],
+  hijosPorPadrePrincipal: Map<string, Set<string>>,
+  conyugesAdjuntosPorPersona: Map<string, Set<string>>,
+) {
+  const profundidades = new Map<string, number>();
+  const cola = raices.map((id) => ({ id, profundidad: 1 }));
+  for (let indice = 0; indice < cola.length; indice += 1) {
+    const { id, profundidad } = cola[indice];
+    const existente = profundidades.get(id);
+    if (existente !== undefined && existente <= profundidad) continue;
+    profundidades.set(id, profundidad);
+    for (const conyuge of conyugesAdjuntosPorPersona.get(id) ?? []) {
+      cola.push({ id: conyuge, profundidad });
+    }
+    for (const hijo of hijosPorPadrePrincipal.get(id) ?? []) {
+      cola.push({ id: hijo, profundidad: profundidad + 1 });
+    }
+  }
+  return profundidades;
+}
+
+function calcularProfundidadesObjetivoRaices(
+  modelo: ModeloArbol,
+  raices: string[],
+  raizPorPersona: Map<string, string>,
+  profundidades: Map<string, number>,
+) {
+  const objetivos = new Map<string, number>();
+  for (const raiz of raices) {
+    const profundidadesConyugesExternos = ordenarIds(modelo.conyugesPorPersona.get(raiz) ?? [], modelo.personas)
+      .filter((conyuge) => raizPorPersona.get(conyuge) !== raiz)
+      .map((conyuge) => profundidades.get(conyuge))
+      .filter((profundidad): profundidad is number => typeof profundidad === "number");
+    objetivos.set(raiz, Math.max(1, ...profundidadesConyugesExternos));
+  }
+  return objetivos;
+}
+
 /*
  * family-chart calcula una jerarquia, no un grafo genealogico con uniones de
  * ramas. Para posicionar cada tarjeta exactamente una vez se elige un solo
@@ -521,6 +682,7 @@ export function crearBosqueLayoutArbol(modelo: ModeloArbol): BosqueLayoutArbol {
   const padrePrincipalPorHijo = new Map<string, string>();
   const hijosPorPadrePrincipal = new Map<string, Set<string>>();
   const ordenLayoutPorPersona = new Map<string, number>();
+  const profundidadObjetivoPorRaiz = new Map<string, number>();
   const idsPorProfundidad = ordenarIds(modelo.personas.keys(), modelo.personas).sort((a, b) =>
     (profundidades.get(a) ?? 0) - (profundidades.get(b) ?? 0)
     || claveOrden(modelo.personas.get(a)!).localeCompare(claveOrden(modelo.personas.get(b)!), "es"));
@@ -563,6 +725,18 @@ export function crearBosqueLayoutArbol(modelo: ModeloArbol): BosqueLayoutArbol {
       hijosPorPadrePrincipal,
       ordenLayoutPorPersona,
     );
+    const profundidadesRelativas = calcularProfundidadesRelativasBosque(
+      raicesComponente,
+      hijosPorPadrePrincipal,
+      conyugesAdjuntosPorPersona,
+    );
+    const objetivosComponente = calcularProfundidadesObjetivoRaices(
+      modelo,
+      raicesComponente,
+      raizPorPersona,
+      profundidadesRelativas,
+    );
+    objetivosComponente.forEach((profundidad, raiz) => profundidadObjetivoPorRaiz.set(raiz, profundidad));
     raices.push(...raicesComponente);
   }
   raices.forEach((id, indice) => ordenLayoutPorPersona.set(id, indice));
@@ -572,16 +746,21 @@ export function crearBosqueLayoutArbol(modelo: ModeloArbol): BosqueLayoutArbol {
     personaAdjuntaAConyuge,
     conyugesAdjuntosPorPersona,
     ordenLayoutPorPersona,
+    profundidadObjetivoPorRaiz,
     raices,
   };
 }
 
 export function crearVinculosVisualesArbol(modelo: ModeloArbol): VinculoVisualArbol[] {
   const vinculos: VinculoVisualArbol[] = [];
-  for (const padre of ordenarIds(modelo.personas.keys(), modelo.personas)) {
-    for (const hijo of ordenarIds(modelo.hijosPorPadre.get(padre) ?? [], modelo.personas)) {
-      vinculos.push({ id: `filiacion:${padre}:${hijo}`, tipo: "filiacion", origenId: padre, destinoId: hijo });
-    }
+  for (const familia of modelo.familias) {
+    vinculos.push({
+      id: `union-familiar:${familia.id}`,
+      tipo: "union-familiar",
+      familiaId: familia.id,
+      progenitoresIds: [...familia.progenitores],
+      hijosIds: [...familia.hijos],
+    });
   }
   const parejasAgregadas = new Set<string>();
   for (const persona of ordenarIds(modelo.personas.keys(), modelo.personas)) {
@@ -599,6 +778,49 @@ export function crearVinculosVisualesArbol(modelo: ModeloArbol): VinculoVisualAr
 export function crearDatosFamilyChart(entrada: PersonaArbol[]): DatoFamilyChart[] {
   const modelo = crearModeloArbol(entrada);
   const bosque = crearBosqueLayoutArbol(modelo);
+  const idsUsados = new Set([RAIZ_MAPA_ID, ...modelo.personas.keys()]);
+  const padreVirtualPorRaiz = new Map<string, string>();
+  const entradasRaizTecnica: string[] = [];
+  const nodosVirtuales: DatoFamilyChart[] = [];
+
+  const crearIdVirtual = (raiz: string, nivel: number) => {
+    const base = `__arbol_espaciador__:${raiz}:${nivel}`;
+    let id = base;
+    let sufijo = 1;
+    while (idsUsados.has(id)) {
+      id = `${base}:${sufijo}`;
+      sufijo += 1;
+    }
+    idsUsados.add(id);
+    return id;
+  };
+
+  bosque.raices.forEach((raiz, indiceRaiz) => {
+    const cantidadEspaciadores = Math.max(0, (bosque.profundidadObjetivoPorRaiz.get(raiz) ?? 1) - 1);
+    const idsEspaciadores = Array.from(
+      { length: cantidadEspaciadores },
+      (_, indice) => crearIdVirtual(raiz, indice + 1),
+    );
+    entradasRaizTecnica.push(idsEspaciadores[0] ?? raiz);
+    idsEspaciadores.forEach((id, indice) => {
+      const padre = indice === 0 ? RAIZ_MAPA_ID : idsEspaciadores[indice - 1];
+      const hijo = idsEspaciadores[indice + 1] ?? raiz;
+      nodosVirtuales.push({
+        id,
+        data: {
+          gender: "M",
+          virtual: true,
+          orden: `virtual|${String(indiceRaiz).padStart(6, "0")}|${String(indice).padStart(6, "0")}`,
+          ordenLayout: bosque.ordenLayoutPorPersona.get(raiz),
+          raizLayoutId: raiz,
+        },
+        rels: { parents: [padre], children: [hijo], spouses: [] },
+      });
+    });
+    const ultimoEspaciador = idsEspaciadores.at(-1);
+    if (ultimoEspaciador) padreVirtualPorRaiz.set(raiz, ultimoEspaciador);
+  });
+
   const datos = [...modelo.personas.values()]
     .sort((a, b) => claveOrden(a).localeCompare(claveOrden(b), "es"))
     .map<DatoFamilyChart>((persona) => ({
@@ -618,7 +840,9 @@ export function crearDatosFamilyChart(entrada: PersonaArbol[]): DatoFamilyChart[
         ordenLayout: bosque.ordenLayoutPorPersona.get(persona.id),
       },
       rels: {
-        parents: bosque.padrePrincipalPorHijo.has(persona.id) ? [bosque.padrePrincipalPorHijo.get(persona.id)!] : [],
+        parents: bosque.padrePrincipalPorHijo.has(persona.id)
+          ? [bosque.padrePrincipalPorHijo.get(persona.id)!]
+          : padreVirtualPorRaiz.has(persona.id) ? [padreVirtualPorRaiz.get(persona.id)!] : [],
         children: [...(bosque.hijosPorPadrePrincipal.get(persona.id) ?? [])],
         // Solo se entrega la orientacion tecnica que mantiene juntas las
         // tarjetas sin duplicarlas. La reciprocidad y todas las lineas reales
@@ -630,8 +854,8 @@ export function crearDatosFamilyChart(entrada: PersonaArbol[]): DatoFamilyChart[
   return [{
     id: RAIZ_MAPA_ID,
     data: { gender: "M", virtual: true, orden: "" },
-    rels: { parents: [], children: bosque.raices, spouses: [] },
-  }, ...datos];
+    rels: { parents: [], children: entradasRaizTecnica, spouses: [] },
+  }, ...nodosVirtuales, ...datos];
 }
 
 export function diagnosticarModeloArbol(entrada: PersonaArbol[]) {
@@ -642,7 +866,8 @@ export function diagnosticarModeloArbol(entrada: PersonaArbol[]) {
     errores: modelo.problemas,
     cantidadPersonas: modelo.personas.size,
     cantidadComponentes: modelo.componentes.length,
-    cantidadFiliaciones: vinculos.filter((vinculo) => vinculo.tipo === "filiacion").length,
+    cantidadFiliaciones: [...modelo.hijosPorPadre.values()].reduce((total, hijos) => total + hijos.size, 0),
+    cantidadUnionesFamiliares: vinculos.filter((vinculo) => vinculo.tipo === "union-familiar").length,
     cantidadVinculosConyugales: vinculos.filter((vinculo) => vinculo.tipo === "conyugal").length,
     raicesLayout: bosque.raices,
     componentes: modelo.componentes,
@@ -652,7 +877,8 @@ export function diagnosticarModeloArbol(entrada: PersonaArbol[]) {
 
 export function diagnosticarDatosFamilyChart(datos: DatoFamilyChart[]) {
   const porId = new Map(datos.map((dato) => [dato.id, dato]));
-  const reales = datos.filter((dato) => dato.id !== RAIZ_MAPA_ID);
+  const reales = datos.filter((dato) => !dato.data.virtual);
+  const virtuales = datos.filter((dato) => dato.data.virtual);
   const errores: string[] = [];
   const alcanzables = new Set<string>();
   const cola = [RAIZ_MAPA_ID];
@@ -665,7 +891,8 @@ export function diagnosticarDatosFamilyChart(datos: DatoFamilyChart[]) {
       if (!alcanzables.has(relacionado)) cola.push(relacionado);
     });
   }
-  for (const dato of reales) {
+  for (const dato of datos) {
+    if (dato.id === RAIZ_MAPA_ID) continue;
     for (const padre of dato.rels.parents) {
       if (!porId.get(padre)?.rels.children.includes(dato.id)) errores.push(`${dato.id}: layout sin reciprocidad con ${padre}`);
     }
@@ -677,11 +904,26 @@ export function diagnosticarDatosFamilyChart(datos: DatoFamilyChart[]) {
     .filter((dato) => !alcanzables.has(dato.id))
     .map((dato) => ({ id: dato.id, motivo: "persona sin camino unico desde la raiz tecnica" }));
   faltantes.forEach(({ id, motivo }) => errores.push(`${id}: ${motivo}`));
+  const resolverRaizReal = (idInicial: string) => {
+    let id = idInicial;
+    const visitados = new Set<string>();
+    while (porId.get(id)?.data.virtual && !visitados.has(id)) {
+      visitados.add(id);
+      const hijos = porId.get(id)?.rels.children ?? [];
+      if (hijos.length !== 1) return null;
+      id = hijos[0];
+    }
+    return porId.get(id)?.data.virtual ? null : id;
+  };
+  const raicesLayout = (porId.get(RAIZ_MAPA_ID)?.rels.children ?? [])
+    .map(resolverRaizReal)
+    .filter((id): id is string => !!id);
   return {
     errores,
     cantidadPersonas: reales.length,
     cantidadAlcanzables: reales.length - faltantes.length,
+    cantidadNodosVirtuales: virtuales.length,
     faltantes,
-    raicesLayout: porId.get(RAIZ_MAPA_ID)?.rels.children ?? [],
+    raicesLayout,
   };
 }

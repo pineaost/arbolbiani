@@ -9,6 +9,7 @@ import {
   compararHijosParaLayout,
   crearDatosFamilyChart,
   crearModeloArbol,
+  crearTrazoVinculoArbol,
   crearVinculosVisualesArbol,
   diagnosticarDatosFamilyChart,
   diagnosticarModeloArbol,
@@ -16,7 +17,7 @@ import {
   ordenarConyugesParaLayout,
   RAIZ_MAPA_ID,
 } from "@/lib/arbol-chart";
-import type { VinculoVisualArbol } from "@/lib/arbol-chart";
+import type { NodoPosicionadoArbol, VinculoVisualArbol } from "@/lib/arbol-chart";
 import type { PersonaArbol } from "@/lib/supabase/types";
 
 type FamilyChart = ReturnType<(typeof import("family-chart"))["createChart"]>;
@@ -33,37 +34,10 @@ const variablesGeometriaArbol = {
   "--arbol-nodo-alto": `${GEOMETRIA_ARBOL.altoNodo}px`,
 } as CSSProperties;
 
-interface NodoPosicionado {
-  data: { id: string };
-  x: number;
-  y: number;
-}
+type NodoPosicionado = NodoPosicionadoArbol;
 
-function puntoEnBorde(origen: NodoPosicionado, destino: NodoPosicionado) {
-  const dx = destino.x - origen.x;
-  const dy = destino.y - origen.y;
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    return { x: origen.x + Math.sign(dx || 1) * GEOMETRIA_ARBOL.anchoNodo / 2, y: origen.y };
-  }
-  return { x: origen.x, y: origen.y + Math.sign(dy || 1) * GEOMETRIA_ARBOL.altoNodo / 2 };
-}
-
-function trazoVinculo(origen: NodoPosicionado, destino: NodoPosicionado, tipo: VinculoVisualArbol["tipo"]) {
-  if (tipo === "filiacion") {
-    const inicio = { x: origen.x, y: origen.y + GEOMETRIA_ARBOL.altoNodo / 2 };
-    const fin = { x: destino.x, y: destino.y - GEOMETRIA_ARBOL.altoNodo / 2 };
-    const yMedio = (inicio.y + fin.y) / 2;
-    return `M${inicio.x},${inicio.y} C${inicio.x},${yMedio} ${fin.x},${yMedio} ${fin.x},${fin.y}`;
-  }
-
-  const inicio = puntoEnBorde(origen, destino);
-  const fin = puntoEnBorde(destino, origen);
-  if (Math.abs(inicio.x - fin.x) >= Math.abs(inicio.y - fin.y)) {
-    const xMedio = (inicio.x + fin.x) / 2;
-    return `M${inicio.x},${inicio.y} C${xMedio},${inicio.y} ${xMedio},${fin.y} ${fin.x},${fin.y}`;
-  }
-  const yMedio = (inicio.y + fin.y) / 2;
-  return `M${inicio.x},${inicio.y} C${inicio.x},${yMedio} ${fin.x},${yMedio} ${fin.x},${fin.y}`;
+function trazoVinculo(vinculo: VinculoVisualArbol, nodos: NodoPosicionado[]) {
+  return crearTrazoVinculoArbol(vinculo, nodos);
 }
 
 function dibujarVinculosNormalizados(
@@ -77,18 +51,23 @@ function dibujarVinculosNormalizados(
   capa.querySelectorAll<SVGPathElement>("path.link").forEach((path) => {
     path.style.display = "none";
   });
-  const nodosPorId = new Map(nodos.map((nodo) => [nodo.data.id, nodo]));
   for (const vinculo of vinculos) {
-    const origen = nodosPorId.get(vinculo.origenId);
-    const destino = nodosPorId.get(vinculo.destinoId);
-    if (!origen || !destino) continue;
+    const trazo = trazoVinculo(vinculo, nodos);
+    if (!trazo) continue;
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("class", `arbol-vinculo-normalizado arbol-vinculo-${vinculo.tipo}`);
-    path.setAttribute("d", trazoVinculo(origen, destino, vinculo.tipo));
+    path.setAttribute("d", trazo.d);
     path.setAttribute("data-vinculo-id", vinculo.id);
     path.setAttribute("data-vinculo-tipo", vinculo.tipo);
+    path.setAttribute("data-vinculo-modo", trazo.modo);
     path.setAttribute("fill", "none");
     capa.appendChild(path);
+    if (trazo.degradado && process.env.NODE_ENV !== "production") {
+      console.info("[Árbol Biani] Unión familiar degradada a curvas individuales por hijos no contiguos", {
+        vinculoId: vinculo.id,
+        hijosIds: vinculo.tipo === "union-familiar" ? vinculo.hijosIds : [],
+      });
+    }
   }
 }
 
@@ -157,7 +136,7 @@ export function ArbolClient({ personas }: Props) {
         .setSortChildrenFunction(compararHijosParaLayout)
         .setSortSpousesFunction(ordenarConyugesParaLayout);
       chart.setCardHtml().setStyle("rect").setCardDim({ w: GEOMETRIA_ARBOL.anchoNodo, h: GEOMETRIA_ARBOL.altoNodo }).setCardInnerHtmlCreator((datum) => {
-        if (datum.data.id === RAIZ_MAPA_ID) return '<div class="arbol-raiz-tecnica" aria-hidden="true"></div>';
+        if (datum.data.data.virtual) return '<div class="arbol-raiz-tecnica" aria-hidden="true"></div>';
         const datosPersona = datum.data.data;
         const nombre = datosPersona.nombre ?? "";
         const apellido = datosPersona.apellido ?? "";
@@ -165,19 +144,18 @@ export function ArbolClient({ personas }: Props) {
         const claseLineaSangre = datosPersona.sinLineaSangre ? " arbol-nodo-sin-linea-sangre" : "";
         const claseGenero = datosPersona.sinGeneroDefinido ? " arbol-nodo-sin-genero" : "";
         return `<div class="arbol-nodo${claseLineaSangre}${claseGenero}" data-persona-id="${escaparHtml(datum.data.id)}" role="button" tabindex="0" aria-label="Abrir ficha de ${escaparHtml(nombrePersona)}" title="${escaparHtml(nombrePersona)}"><span class="arbol-nodo-nombre">${escaparHtml(nombrePersona)}</span>${datosPersona.anios ? `<span class="arbol-nodo-anios">${escaparHtml(datosPersona.anios)}</span>` : ""}</div>`;
-      }).setOnCardClick((_event: MouseEvent, datum: { data: { id: string } }) => { if (datum.data.id !== RAIZ_MAPA_ID) setPersonaSeleccionadaId(datum.data.id); });
+      }).setOnCardClick((_event: MouseEvent, datum: { data: { id: string; data: { virtual?: boolean } } }) => { if (!datum.data.data.virtual) setPersonaSeleccionadaId(datum.data.id); });
       chart.setAfterUpdate(() => {
         const nodos = (chart.store.getTree()?.data ?? []) as NodoPosicionado[];
         dibujarVinculosNormalizados(chart.svg, nodos, vinculosVisuales);
       });
       chart.updateTree({ initial: true, tree_position: "fit", transition_time: 0 });
       if (process.env.NODE_ENV !== "production") {
-        const raizTecnica = datosChart.find((dato) => dato.id === RAIZ_MAPA_ID);
-        const raicesEnviadas = (raizTecnica?.rels.children ?? []).map((id) => ({
+        const diagnosticoLayout = diagnosticarDatosFamilyChart(datosChart);
+        const raicesEnviadas = diagnosticoLayout.raicesLayout.map((id) => ({
           id,
           nombre: `${datosChart.find((dato) => dato.id === id)?.data.nombre ?? ""} ${datosChart.find((dato) => dato.id === id)?.data.apellido ?? ""}`.trim(),
         }));
-        const diagnosticoLayout = diagnosticarDatosFamilyChart(datosChart);
         console.info("[Árbol Biani] main_id/root y raíces entregadas a family-chart", {
           mainIdFamilyChart: chart.store.getMainId(),
           raizTecnicaId: RAIZ_MAPA_ID,
@@ -185,8 +163,9 @@ export function ArbolClient({ personas }: Props) {
           raicesAuditadas: diagnosticoLayout.raicesLayout,
           coincideConAuditoria: raicesEnviadas.map(({ id }) => id).join("|") === diagnosticoLayout.raicesLayout.join("|"),
         });
-        const esperados = datosChart.filter((dato) => dato.id !== RAIZ_MAPA_ID).map((dato) => dato.id);
-        const idsRenderizados = (chart.store.getTree()?.data.map((dato) => dato.data.id) ?? []).filter((id) => id !== RAIZ_MAPA_ID);
+        const esperados = datosChart.filter((dato) => !dato.data.virtual).map((dato) => dato.id);
+        const idsVirtuales = new Set(datosChart.filter((dato) => dato.data.virtual).map((dato) => dato.id));
+        const idsRenderizados = (chart.store.getTree()?.data.map((dato) => dato.data.id) ?? []).filter((id) => !idsVirtuales.has(id));
         const renderizados = new Set(idsRenderizados);
         const faltantesEnLayout = esperados.filter((id) => !renderizados.has(id));
         const duplicadosEnLayout = [...new Set(idsRenderizados.filter((id, indice) => idsRenderizados.indexOf(id) !== indice))];

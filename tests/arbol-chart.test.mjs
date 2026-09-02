@@ -37,6 +37,7 @@ const {
   compararHijosParaLayout,
   crearDatosFamilyChart,
   crearModeloArbol,
+  crearTrazoVinculoArbol,
   crearVinculosVisualesArbol,
   diagnosticarDatosFamilyChart,
   diagnosticarModeloArbol,
@@ -84,7 +85,9 @@ function calcularArbol(datos) {
 
 function idsRenderizados(datos) {
   const arbol = calcularArbol(datos);
-  return arbol.data.map((dato) => dato.data.id).filter((id) => id !== RAIZ_MAPA_ID);
+  return arbol.data
+    .filter((dato) => !dato.data.data.virtual)
+    .map((dato) => dato.data.id);
 }
 
 function componente(modelo, id) {
@@ -96,6 +99,11 @@ function componente(modelo, id) {
 function personaPersistida(id, nacimiento = "1950-01-01") {
   const { padres_ids, hijos_ids, conyuges_ids, hermanos_ids, ...persistida } = persona(id, { nacimiento });
   return persistida;
+}
+
+function unionesFamiliares(personas) {
+  return crearVinculosVisualesArbol(crearModeloArbol(personas))
+    .filter(({ tipo }) => tipo === "union-familiar");
 }
 
 test("dos cónyuges con padres y abuelos propios conservan ambas ascendencias", () => {
@@ -119,13 +127,131 @@ test("dos cónyuges con padres y abuelos propios conservan ambas ascendencias", 
   assert.deepEqual(
     new Set(crearVinculosVisualesArbol(modelo).map(({ id }) => id)),
     new Set([
-      "filiacion:a-abuelo:a-padre",
-      "filiacion:a-padre:a",
-      "filiacion:b-abuelo:b-padre",
-      "filiacion:b-padre:b",
+      "union-familiar:a-abuelo",
+      "union-familiar:a-padre",
+      "union-familiar:b-abuelo",
+      "union-familiar:b-padre",
       "conyugal:a:b",
     ]),
   );
+});
+
+test("una pareja con uno o varios hijos genera una sola unión familiar", () => {
+  const unHijo = [
+    persona("progenitor-a", { hijos: ["hijo"], conyuges: ["progenitor-b"] }),
+    persona("progenitor-b", { hijos: ["hijo"], conyuges: ["progenitor-a"] }),
+    persona("hijo", { padres: ["progenitor-a", "progenitor-b"] }),
+  ];
+  const variosHijos = [
+    persona("progenitor-a", { hijos: ["hijo-1", "hijo-2", "hijo-3"], conyuges: ["progenitor-b"] }),
+    persona("progenitor-b", { hijos: ["hijo-1", "hijo-2", "hijo-3"], conyuges: ["progenitor-a"] }),
+    persona("hijo-1", { padres: ["progenitor-a", "progenitor-b"] }),
+    persona("hijo-2", { padres: ["progenitor-a", "progenitor-b"] }),
+    persona("hijo-3", { padres: ["progenitor-a", "progenitor-b"] }),
+  ];
+
+  assert.deepEqual(unionesFamiliares(unHijo), [{
+    id: "union-familiar:progenitor-a:progenitor-b",
+    tipo: "union-familiar",
+    familiaId: "progenitor-a:progenitor-b",
+    progenitoresIds: ["progenitor-a", "progenitor-b"],
+    hijosIds: ["hijo"],
+  }]);
+  assert.deepEqual(unionesFamiliares(variosHijos)[0]?.hijosIds, ["hijo-1", "hijo-2", "hijo-3"]);
+  assert.equal(unionesFamiliares(variosHijos).length, 1);
+
+  const trazo = crearTrazoVinculoArbol(unionesFamiliares(unHijo)[0], [
+    { data: { id: "progenitor-a", data: {} }, x: -108, y: 0 },
+    { data: { id: "progenitor-b", data: {} }, x: 108, y: 0 },
+    { data: { id: "hijo", data: {} }, x: 0, y: 148 },
+  ]);
+  assert.equal(trazo?.modo, "bus");
+  assert.equal(trazo?.degradado, false);
+  assert.equal(trazo?.d.includes(" H"), true);
+});
+
+test("un único progenitor consolida todos sus hijos bajo una sola unión", () => {
+  const personas = [
+    persona("progenitor", { hijos: ["hijo-1", "hijo-2"] }),
+    persona("hijo-1", { padres: ["progenitor"] }),
+    persona("hijo-2", { padres: ["progenitor"] }),
+  ];
+
+  assert.deepEqual(unionesFamiliares(personas), [{
+    id: "union-familiar:progenitor",
+    tipo: "union-familiar",
+    familiaId: "progenitor",
+    progenitoresIds: ["progenitor"],
+    hijosIds: ["hijo-1", "hijo-2"],
+  }]);
+});
+
+test("dos uniones de una persona mantienen separados sus respectivos hijos", () => {
+  const personas = [
+    persona("progenitor", { hijos: ["hijo-a", "hijo-b"], conyuges: ["pareja-a", "pareja-b"] }),
+    persona("pareja-a", { hijos: ["hijo-a"], conyuges: ["progenitor"] }),
+    persona("pareja-b", { hijos: ["hijo-b"], conyuges: ["progenitor"] }),
+    persona("hijo-a", { padres: ["progenitor", "pareja-a"] }),
+    persona("hijo-b", { padres: ["progenitor", "pareja-b"] }),
+  ];
+  const uniones = unionesFamiliares(personas);
+
+  assert.equal(uniones.length, 2);
+  assert.deepEqual(new Set(uniones.map(({ progenitoresIds, hijosIds }) => `${progenitoresIds.join("+")}=>${hijosIds.join("+")}`)), new Set([
+    "pareja-a+progenitor=>hijo-a",
+    "pareja-b+progenitor=>hijo-b",
+  ]));
+});
+
+test("la unión parental existe aunque los progenitores no tengan vínculo conyugal", () => {
+  const personas = [
+    persona("progenitor-a", { hijos: ["hijo"] }),
+    persona("progenitor-b", { hijos: ["hijo"] }),
+    persona("hijo", { padres: ["progenitor-a", "progenitor-b"] }),
+  ];
+  const vinculos = crearVinculosVisualesArbol(crearModeloArbol(personas));
+
+  assert.equal(vinculos.filter(({ tipo }) => tipo === "union-familiar").length, 1);
+  assert.equal(vinculos.filter(({ tipo }) => tipo === "conyugal").length, 0);
+});
+
+test("hermanos completos y medios hermanos se agrupan por sus progenitores reales", () => {
+  const personas = [
+    persona("progenitor", { hijos: ["completo-1", "completo-2", "medio"] }),
+    persona("pareja-a", { hijos: ["completo-1", "completo-2"] }),
+    persona("pareja-b", { hijos: ["medio"] }),
+    persona("completo-1", { padres: ["progenitor", "pareja-a"] }),
+    persona("completo-2", { padres: ["progenitor", "pareja-a"] }),
+    persona("medio", { padres: ["progenitor", "pareja-b"] }),
+  ];
+  const grupos = unionesFamiliares(personas).map(({ progenitoresIds, hijosIds }) => ({ progenitoresIds, hijosIds }));
+
+  assert.deepEqual(grupos, [
+    { progenitoresIds: ["pareja-a", "progenitor"], hijosIds: ["completo-1", "completo-2"] },
+    { progenitoresIds: ["pareja-b", "progenitor"], hijosIds: ["medio"] },
+  ]);
+});
+
+test("una unión con hijos no contiguos degrada a curvas individuales", () => {
+  const vinculo = {
+    id: "union-familiar:progenitor",
+    tipo: "union-familiar",
+    familiaId: "progenitor",
+    progenitoresIds: ["progenitor"],
+    hijosIds: ["hijo-1", "hijo-2"],
+  };
+  const nodos = [
+    { data: { id: "progenitor", data: {} }, x: 0, y: 0 },
+    { data: { id: "hijo-1", data: {} }, x: -216, y: 148 },
+    { data: { id: "medio-intercalado", data: {} }, x: 0, y: 148 },
+    { data: { id: "hijo-2", data: {} }, x: 216, y: 148 },
+  ];
+  const resultado = crearTrazoVinculoArbol(vinculo, nodos);
+
+  assert.equal(resultado?.modo, "individual");
+  assert.equal(resultado?.degradado, true);
+  assert.equal(resultado?.d.includes(" H"), false, "la degradación no debe dibujar una barra horizontal");
+  assert.equal((resultado?.d.match(/M/g) ?? []).length, 2, "debe crear una curva independiente por hijo");
 });
 
 test("tres ramas conectadas por matrimonios forman un componente sin perder raíces", () => {
@@ -277,6 +403,71 @@ test("los ciclos existentes se diagnostican y un alta que cerraría un ciclo se 
   const resultado = await agregarFiliacion({ padre_id: "c", hijo_id: "a" });
   assert.match(resultado.error, /ciclo/i);
   assert.equal(inserto, false);
+});
+
+test("una única raíz ancestral conserva la profundidad y no agrega espaciadores", () => {
+  const personas = [
+    persona("raiz", { hijos: ["hijo"], nacimiento: "1900-01-01" }),
+    persona("hijo", { padres: ["raiz"], hijos: ["nieto"], nacimiento: "1930-01-01" }),
+    persona("nieto", { padres: ["hijo"], nacimiento: "1960-01-01" }),
+  ];
+  const datos = crearDatosFamilyChart(personas);
+  const nodos = calcularArbol(datos).data;
+  const porId = new Map(nodos.map((nodo) => [nodo.data.id, nodo]));
+
+  assert.deepEqual(datos.filter(({ data }) => data.virtual).map(({ id }) => id), [RAIZ_MAPA_ID]);
+  assert.equal(porId.get("hijo").y - porId.get("raiz").y, GEOMETRIA_ARBOL.separacionVertical);
+  assert.equal(porId.get("nieto").y - porId.get("hijo").y, GEOMETRIA_ARBOL.separacionVertical);
+});
+
+test("una raíz técnica conectada a un cónyuge profundo se alinea a su generación", () => {
+  const personas = [
+    persona("raiz-larga", { hijos: ["segunda-generacion"], nacimiento: "1900-01-01" }),
+    persona("segunda-generacion", { padres: ["raiz-larga"], hijos: ["ancla-profunda"], nacimiento: "1930-01-01" }),
+    persona("ancla-profunda", { padres: ["segunda-generacion"], conyuges: ["pareja-profunda"], nacimiento: "1960-01-01" }),
+    persona("pareja-profunda", { conyuges: ["ancla-profunda", "raiz-corta"], nacimiento: "1961-01-01" }),
+    persona("raiz-corta", { conyuges: ["pareja-profunda"], nacimiento: "1962-01-01" }),
+  ];
+  const datos = crearDatosFamilyChart(personas);
+  const auditoria = diagnosticarDatosFamilyChart(datos);
+  const nodos = calcularArbol(datos).data;
+  const porId = new Map(nodos.map((nodo) => [nodo.data.id, nodo]));
+  const espaciadores = datos.filter(({ id, data }) => id !== RAIZ_MAPA_ID && data.virtual);
+
+  assert.equal(espaciadores.length, 2, "la raíz debe bajar desde profundidad 1 hasta profundidad 3");
+  assert.equal(porId.get("raiz-corta").y, porId.get("pareja-profunda").y);
+  const cadena = [RAIZ_MAPA_ID, ...espaciadores.map(({ id }) => id), "raiz-corta"].map((id) => porId.get(id));
+  assert.deepEqual(
+    cadena.slice(1).map((nodo) => nodo.x),
+    Array(cadena.length - 1).fill(porId.get("raiz-corta").x),
+    "los espaciadores no deben sumar ancho horizontal",
+  );
+  assert.deepEqual(
+    cadena.slice(1).map((nodo, indice) => nodo.y - cadena[indice].y),
+    Array(cadena.length - 1).fill(GEOMETRIA_ARBOL.separacionVertical),
+    "la cadena debe ocupar exactamente un nivel por generación, sin saltos",
+  );
+  assert.equal(espaciadores.every(({ data }) => data.nombre === undefined && data.apellido === undefined), true);
+  assert.equal(espaciadores.every(({ rels }) => rels.parents.length === 1 && rels.children.length === 1), true);
+  assert.deepEqual(auditoria.errores, []);
+  assert.equal(auditoria.cantidadPersonas, personas.length);
+  assert.equal(auditoria.cantidadAlcanzables, personas.length);
+  assert.equal(auditoria.cantidadNodosVirtuales, 3);
+});
+
+test("dos raíces ancestrales genuinas conectadas por descendientes permanecen arriba", () => {
+  const personas = [
+    persona("raiz-a", { hijos: ["descendiente-a"], nacimiento: "1900-01-01" }),
+    persona("descendiente-a", { padres: ["raiz-a"], conyuges: ["descendiente-b"], nacimiento: "1930-01-01" }),
+    persona("raiz-b", { hijos: ["descendiente-b"], nacimiento: "1901-01-01" }),
+    persona("descendiente-b", { padres: ["raiz-b"], conyuges: ["descendiente-a"], nacimiento: "1931-01-01" }),
+  ];
+  const datos = crearDatosFamilyChart(personas);
+  const nodos = calcularArbol(datos).data;
+  const porId = new Map(nodos.map((nodo) => [nodo.data.id, nodo]));
+
+  assert.deepEqual(datos.filter(({ data }) => data.virtual).map(({ id }) => id), [RAIZ_MAPA_ID]);
+  assert.equal(porId.get("raiz-a").y, porId.get("raiz-b").y);
 });
 
 test("el layout es determinista al recalcularse como en una recarga", () => {
@@ -486,6 +677,12 @@ test("integración a escala: cuatro líneas de sangre conservan cobertura, raíc
   );
   const vinculos = crearVinculosVisualesArbol(modelo);
   assert.equal(new Set(vinculos.map(({ id }) => id)).size, vinculos.length, "cada línea real debe generarse una sola vez");
+  const nodosPosicionados = calcularArbol(datos).data;
+  assert.equal(
+    vinculos.map((vinculo) => crearTrazoVinculoArbol(vinculo, nodosPosicionados)).filter(Boolean).length,
+    vinculos.length,
+    "cada vínculo esperado debe producir un trazo con los nodos posicionados",
+  );
 
   const renderizados = idsRenderizados(datos);
   assert.equal(renderizados.length, personas.length, "family-chart debe crear exactamente una tarjeta por persona");
