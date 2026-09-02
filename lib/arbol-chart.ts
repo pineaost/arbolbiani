@@ -24,6 +24,7 @@ export interface DatoFamilyChart {
     sinLineaSangre?: boolean;
     sinGeneroDefinido?: boolean;
     tieneConyuge?: boolean;
+    ordenLayout?: number;
   };
   rels: { parents: string[]; children: string[]; spouses: string[] };
 }
@@ -67,6 +68,7 @@ export interface BosqueLayoutArbol {
   hijosPorPadrePrincipal: Map<string, Set<string>>;
   personaAdjuntaAConyuge: Map<string, string>;
   conyugesAdjuntosPorPersona: Map<string, Set<string>>;
+  ordenLayoutPorPersona: Map<string, number>;
   raices: string[];
 }
 
@@ -81,7 +83,7 @@ export interface VinculoVisualArbol {
 // de family-chart, que permite pasar estas funciones directo a su API.
 interface DatoOrdenableParaLayout {
   id: string;
-  data: { gender: "M" | "F"; orden?: string; tieneConyuge?: boolean };
+  data: { gender: "M" | "F"; orden?: string; tieneConyuge?: boolean; ordenLayout?: number };
   rels: { spouses: string[] };
 }
 
@@ -158,7 +160,11 @@ export function compararHijosParaLayout(a: DatoOrdenableParaLayout, b: DatoOrden
     return dato.data.gender === "F" ? 0 : 2;
   };
   const orden = (dato: DatoOrdenableParaLayout) => typeof dato.data.orden === "string" ? dato.data.orden : "";
-  return prioridad(a) - prioridad(b) || orden(a).localeCompare(orden(b), "es");
+  const ordenLayoutA = a.data.ordenLayout;
+  const ordenLayoutB = b.data.ordenLayout;
+  return typeof ordenLayoutA === "number" && typeof ordenLayoutB === "number"
+    ? ordenLayoutA - ordenLayoutB || orden(a).localeCompare(orden(b), "es")
+    : prioridad(a) - prioridad(b) || orden(a).localeCompare(orden(b), "es");
 }
 
 export function ordenarConyugesParaLayout(persona: DatoOrdenableParaLayout, datos: DatoOrdenableParaLayout[]) {
@@ -343,6 +349,166 @@ function seleccionarConyugesAdjuntos(modelo: ModeloArbol) {
   return { personaAdjuntaAConyuge, conyugesAdjuntosPorPersona };
 }
 
+type PesosConexionRaices = Map<string, Map<string, number>>;
+
+function asignarRaizPorPersona(
+  modelo: ModeloArbol,
+  idsComponente: string[],
+  raicesBase: string[],
+  hijosPorPadrePrincipal: Map<string, Set<string>>,
+  personaAdjuntaAConyuge: Map<string, string>,
+) {
+  const raizPorPersona = new Map<string, string>();
+  const idsDelComponente = new Set(idsComponente);
+  const indiceRaiz = new Map(raicesBase.map((id, indice) => [id, indice]));
+
+  for (const raiz of raicesBase) {
+    const cola = [raiz];
+    for (let indice = 0; indice < cola.length; indice += 1) {
+      const id = cola[indice];
+      if (!idsDelComponente.has(id) || raizPorPersona.has(id)) continue;
+      raizPorPersona.set(id, raiz);
+      cola.push(...ordenarIds(hijosPorPadrePrincipal.get(id) ?? [], modelo.personas));
+    }
+  }
+
+  // Los conyuges adjuntos no forman parte de children en la jerarquia de
+  // family-chart. Si tienen progenitores propios conservan la raiz de esa
+  // filiacion; solo quienes no tienen una rama propia heredan la del conyuge
+  // que los posiciona lateralmente.
+  let huboCambios = true;
+  while (huboCambios) {
+    huboCambios = false;
+    for (const id of ordenarIds(idsComponente, modelo.personas)) {
+      if (raizPorPersona.has(id)) continue;
+      const raicesDePadres = [...new Set(
+        ordenarIds(modelo.padresPorHijo.get(id) ?? [], modelo.personas)
+          .map((padre) => raizPorPersona.get(padre))
+          .filter((raiz): raiz is string => !!raiz),
+      )].sort((a, b) => (indiceRaiz.get(a) ?? 0) - (indiceRaiz.get(b) ?? 0));
+      const propietario = personaAdjuntaAConyuge.get(id);
+      const raizPropietario = propietario ? raizPorPersona.get(propietario) : undefined;
+      const raiz = raicesDePadres[0] ?? raizPropietario;
+      if (!raiz) continue;
+      raizPorPersona.set(id, raiz);
+      huboCambios = true;
+    }
+  }
+
+  const raizDeRespaldo = raicesBase[0];
+  if (raizDeRespaldo) {
+    idsComponente.forEach((id) => {
+      if (!raizPorPersona.has(id)) raizPorPersona.set(id, raizDeRespaldo);
+    });
+  }
+  return raizPorPersona;
+}
+
+function construirPesosConexionRaices(
+  modelo: ModeloArbol,
+  idsComponente: string[],
+  raizPorPersona: Map<string, string>,
+) {
+  const pesos: PesosConexionRaices = new Map();
+  const idsDelComponente = new Set(idsComponente);
+  const parejasContadas = new Set<string>();
+  const sumar = (origen: string, destino: string) => {
+    const conexiones = pesos.get(origen) ?? new Map<string, number>();
+    conexiones.set(destino, (conexiones.get(destino) ?? 0) + 1);
+    pesos.set(origen, conexiones);
+  };
+
+  for (const persona of ordenarIds(idsComponente, modelo.personas)) {
+    for (const pareja of ordenarIds(modelo.conyugesPorPersona.get(persona) ?? [], modelo.personas)) {
+      if (!idsDelComponente.has(pareja)) continue;
+      const clavePareja = [persona, pareja].sort().join(":");
+      if (parejasContadas.has(clavePareja)) continue;
+      parejasContadas.add(clavePareja);
+      const raizPersona = raizPorPersona.get(persona);
+      const raizPareja = raizPorPersona.get(pareja);
+      if (!raizPersona || !raizPareja || raizPersona === raizPareja) continue;
+      sumar(raizPersona, raizPareja);
+      sumar(raizPareja, raizPersona);
+    }
+  }
+  return pesos;
+}
+
+function ordenarRaicesPorConectividad(raicesBase: string[], pesos: PesosConexionRaices) {
+  if (raicesBase.length < 2) return [...raicesBase];
+  const indiceBase = new Map(raicesBase.map((id, indice) => [id, indice]));
+  const ordenadas = [raicesBase[0]];
+  const pendientes = new Set(raicesBase.slice(1));
+
+  while (pendientes.size > 0) {
+    const candidatas = [...pendientes].map((id) => ({
+      id,
+      peso: ordenadas.reduce((total, colocada) => total + (pesos.get(id)?.get(colocada) ?? 0), 0),
+    })).sort((a, b) => b.peso - a.peso || (indiceBase.get(a.id) ?? 0) - (indiceBase.get(b.id) ?? 0));
+    const siguiente = candidatas[0].id;
+    ordenadas.push(siguiente);
+    pendientes.delete(siguiente);
+  }
+  return ordenadas;
+}
+
+function ordenarHijosBase(ids: Iterable<string>, modelo: ModeloArbol) {
+  const prioridad = (id: string) => {
+    if ((modelo.conyugesPorPersona.get(id)?.size ?? 0) === 0) return 1;
+    return modelo.personas.get(id)?.genero === "femenino" ? 0 : 2;
+  };
+  return [...new Set(ids)].sort((a, b) =>
+    prioridad(a) - prioridad(b)
+    || claveOrden(modelo.personas.get(a)!).localeCompare(claveOrden(modelo.personas.get(b)!), "es"));
+}
+
+function ordenarHijosPorConectividad(
+  modelo: ModeloArbol,
+  idsComponente: string[],
+  raicesOrdenadas: string[],
+  raizPorPersona: Map<string, string>,
+  hijosPorPadrePrincipal: Map<string, Set<string>>,
+  ordenLayoutPorPersona: Map<string, number>,
+) {
+  const idsDelComponente = new Set(idsComponente);
+  const indiceRaiz = new Map(raicesOrdenadas.map((id, indice) => [id, indice]));
+
+  for (const padre of ordenarIds(idsComponente, modelo.personas)) {
+    const hijosBase = ordenarHijosBase(hijosPorPadrePrincipal.get(padre) ?? [], modelo);
+    if (hijosBase.length === 0) continue;
+    const indiceBase = new Map(hijosBase.map((id, indice) => [id, indice]));
+    const puntajePorHijo = new Map<string, number>();
+
+    for (const hijo of hijosBase) {
+      const raizPropia = raizPorPersona.get(hijo) ?? raizPorPersona.get(padre);
+      const indicePropio = raizPropia ? indiceRaiz.get(raizPropia) : undefined;
+      let puntaje = 0;
+      const cola = [hijo];
+      const visitados = new Set<string>();
+      for (let indice = 0; indice < cola.length; indice += 1) {
+        const persona = cola[indice];
+        if (visitados.has(persona)) continue;
+        visitados.add(persona);
+        cola.push(...ordenarIds(hijosPorPadrePrincipal.get(persona) ?? [], modelo.personas));
+        for (const pareja of ordenarIds(modelo.conyugesPorPersona.get(persona) ?? [], modelo.personas)) {
+          if (!idsDelComponente.has(pareja)) continue;
+          const raizPareja = raizPorPersona.get(pareja);
+          const indicePareja = raizPareja ? indiceRaiz.get(raizPareja) : undefined;
+          if (indicePropio === undefined || indicePareja === undefined || indicePropio === indicePareja) continue;
+          puntaje += Math.sign(indicePareja - indicePropio);
+        }
+      }
+      puntajePorHijo.set(hijo, puntaje);
+    }
+
+    const hijosOrdenados = [...hijosBase].sort((a, b) =>
+      (puntajePorHijo.get(a) ?? 0) - (puntajePorHijo.get(b) ?? 0)
+      || (indiceBase.get(a) ?? 0) - (indiceBase.get(b) ?? 0));
+    hijosPorPadrePrincipal.set(padre, new Set(hijosOrdenados));
+    hijosOrdenados.forEach((id, indice) => ordenLayoutPorPersona.set(id, indice));
+  }
+}
+
 /*
  * family-chart calcula una jerarquia, no un grafo genealogico con uniones de
  * ramas. Para posicionar cada tarjeta exactamente una vez se elige un solo
@@ -354,6 +520,7 @@ export function crearBosqueLayoutArbol(modelo: ModeloArbol): BosqueLayoutArbol {
   const { personaAdjuntaAConyuge, conyugesAdjuntosPorPersona } = seleccionarConyugesAdjuntos(modelo);
   const padrePrincipalPorHijo = new Map<string, string>();
   const hijosPorPadrePrincipal = new Map<string, Set<string>>();
+  const ordenLayoutPorPersona = new Map<string, number>();
   const idsPorProfundidad = ordenarIds(modelo.personas.keys(), modelo.personas).sort((a, b) =>
     (profundidades.get(a) ?? 0) - (profundidades.get(b) ?? 0)
     || claveOrden(modelo.personas.get(a)!).localeCompare(claveOrden(modelo.personas.get(b)!), "es"));
@@ -371,21 +538,40 @@ export function crearBosqueLayoutArbol(modelo: ModeloArbol): BosqueLayoutArbol {
     asegurar(hijosPorPadrePrincipal, padre).add(hijo);
   }
 
-  // Las raices de cada componente quedan consecutivas. Esto mantiene juntas
-  // las ramas que se conectan por matrimonio, aunque tengan ancestros propios.
+  // Las raices de cada componente quedan consecutivas y, dentro del bloque,
+  // las unidas por matrimonios cruzados se atraen por peso de conectividad.
   const raices: string[] = [];
   for (const componente of modelo.componentes) {
-    const raicesComponente = ordenarIds(
+    const raicesBase = ordenarIds(
       componente.ids.filter((id) => !padrePrincipalPorHijo.has(id) && !personaAdjuntaAConyuge.has(id)),
       modelo.personas,
     );
+    const raizPorPersona = asignarRaizPorPersona(
+      modelo,
+      componente.ids,
+      raicesBase,
+      hijosPorPadrePrincipal,
+      personaAdjuntaAConyuge,
+    );
+    const pesos = construirPesosConexionRaices(modelo, componente.ids, raizPorPersona);
+    const raicesComponente = ordenarRaicesPorConectividad(raicesBase, pesos);
+    ordenarHijosPorConectividad(
+      modelo,
+      componente.ids,
+      raicesComponente,
+      raizPorPersona,
+      hijosPorPadrePrincipal,
+      ordenLayoutPorPersona,
+    );
     raices.push(...raicesComponente);
   }
+  raices.forEach((id, indice) => ordenLayoutPorPersona.set(id, indice));
   return {
     padrePrincipalPorHijo,
     hijosPorPadrePrincipal,
     personaAdjuntaAConyuge,
     conyugesAdjuntosPorPersona,
+    ordenLayoutPorPersona,
     raices,
   };
 }
@@ -429,10 +615,11 @@ export function crearDatosFamilyChart(entrada: PersonaArbol[]): DatoFamilyChart[
           && (modelo.conyugesPorPersona.get(persona.id)?.size ?? 0) > 0,
         sinGeneroDefinido: persona.genero === "no_definido",
         tieneConyuge: (modelo.conyugesPorPersona.get(persona.id)?.size ?? 0) > 0,
+        ordenLayout: bosque.ordenLayoutPorPersona.get(persona.id),
       },
       rels: {
         parents: bosque.padrePrincipalPorHijo.has(persona.id) ? [bosque.padrePrincipalPorHijo.get(persona.id)!] : [],
-        children: ordenarIds(bosque.hijosPorPadrePrincipal.get(persona.id) ?? [], modelo.personas),
+        children: [...(bosque.hijosPorPadrePrincipal.get(persona.id) ?? [])],
         // Solo se entrega la orientacion tecnica que mantiene juntas las
         // tarjetas sin duplicarlas. La reciprocidad y todas las lineas reales
         // siguen saliendo del modelo canonico.

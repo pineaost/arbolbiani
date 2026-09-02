@@ -149,6 +149,56 @@ test("tres ramas conectadas por matrimonios forman un componente sin perder raí
   assert.equal(crearVinculosVisualesArbol(modelo).filter(({ tipo }) => tipo === "conyugal").length, 2);
 });
 
+test("raíces conectadas por matrimonio quedan adyacentes aunque una tercera raíz se ordene entre ambas", () => {
+  const personas = [
+    persona("raiz-a", { hijos: ["persona-a"], nacimiento: "1900-01-01" }),
+    persona("persona-a", { padres: ["raiz-a"], hijos: ["descendiente-compartido"], conyuges: ["persona-b"], nacimiento: "1930-01-01" }),
+    persona("raiz-c", { hijos: ["descendiente-compartido"], nacimiento: "1901-01-01" }),
+    persona("descendiente-compartido", { padres: ["persona-a", "raiz-c"], nacimiento: "1960-01-01" }),
+    persona("raiz-b", { hijos: ["persona-b"], nacimiento: "1902-01-01" }),
+    persona("persona-b", { padres: ["raiz-b"], conyuges: ["persona-a"], nacimiento: "1932-01-01" }),
+  ];
+  const diagnosticoModelo = diagnosticarModeloArbol(personas);
+  const datos = crearDatosFamilyChart(personas);
+  const diagnosticoLayout = diagnosticarDatosFamilyChart(datos);
+
+  assert.equal(diagnosticoModelo.cantidadComponentes, 1);
+  assert.deepEqual(
+    new Set(diagnosticoModelo.componentes[0].raicesAncestrales),
+    new Set(["raiz-a", "raiz-b", "raiz-c"]),
+  );
+  assert.deepEqual(diagnosticoModelo.raicesLayout, ["raiz-a", "raiz-b", "raiz-c"]);
+  assert.deepEqual(diagnosticoLayout.raicesLayout, ["raiz-a", "raiz-b", "raiz-c"]);
+
+  const indiceA = diagnosticoLayout.raicesLayout.indexOf("raiz-a");
+  const indiceB = diagnosticoLayout.raicesLayout.indexOf("raiz-b");
+  assert.equal(Math.abs(indiceA - indiceB), 1, "la raíz C no debe separar las ramas A y B unidas por matrimonio");
+});
+
+test("hijos con matrimonios cruzados se orientan hacia el borde de la raíz conectada", () => {
+  const personas = [
+    persona("raiz-b", { hijos: ["persona-b"], nacimiento: "1899-01-01" }),
+    persona("persona-b", { padres: ["raiz-b"], conyuges: ["hijo-izquierda"], nacimiento: "1931-01-01" }),
+    persona("raiz-a", { hijos: ["hijo-izquierda", "hijo-neutro", "hijo-derecha"], nacimiento: "1900-01-01" }),
+    persona("hijo-izquierda", { padres: ["raiz-a"], conyuges: ["persona-b"], nacimiento: "1930-01-01" }),
+    persona("hijo-neutro", { padres: ["raiz-a"], nacimiento: "1932-01-01" }),
+    persona("hijo-derecha", { padres: ["raiz-a"], conyuges: ["persona-c"], nacimiento: "1933-01-01" }),
+    persona("raiz-c", { hijos: ["persona-c"], nacimiento: "1901-01-01" }),
+    persona("persona-c", { padres: ["raiz-c"], conyuges: ["hijo-derecha"], nacimiento: "1934-01-01" }),
+  ];
+  const datos = crearDatosFamilyChart(personas);
+  const raizA = datos.find(({ id }) => id === "raiz-a");
+
+  assert.deepEqual(datos[0].rels.children, ["raiz-b", "raiz-a", "raiz-c"]);
+  assert.deepEqual(raizA?.rels.children, ["hijo-izquierda", "hijo-neutro", "hijo-derecha"]);
+
+  const hijosPosicionados = calcularArbol(datos).data
+    .filter(({ data }) => raizA?.rels.children.includes(data.id))
+    .sort((a, b) => a.x - b.x)
+    .map(({ data }) => data.id);
+  assert.deepEqual(hijosPosicionados, ["hijo-izquierda", "hijo-neutro", "hijo-derecha"]);
+});
+
 test("personas realmente no vinculadas siguen como componentes y tarjetas separadas", () => {
   const personas = [
     persona("familia-raiz", { hijos: ["familia-hija"], nacimiento: "1900-01-01" }),
