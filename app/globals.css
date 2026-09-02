@@ -59,7 +59,8 @@ body { @apply bg-background text-ink font-body antialiased; }
   background: transparent; color: rgb(var(--sakura-ink));
 }
 
-.arbol-mapa path.link { fill: none; stroke: rgb(var(--sakura-vinculo)); stroke-width: 1.6px; stroke-linecap: round; stroke-linejoin: round; opacity: 0.76; transition: stroke 200ms ease; }
+.arbol-mapa path.link,
+.arbol-mapa path.arbol-vinculo-normalizado { fill: none; stroke: rgb(var(--sakura-vinculo)); stroke-width: 1.6px; stroke-linecap: round; stroke-linejoin: round; opacity: 0.76; transition: stroke 200ms ease; }
 .arbol-mapa .card_cont { pointer-events: none; }
 .arbol-mapa .card-inner, .arbol-mapa .card_cont .card { pointer-events: auto; }
 .arbol-mapa .card-inner { width: var(--arbol-nodo-ancho); height: var(--arbol-nodo-alto); overflow: visible; background: transparent; }

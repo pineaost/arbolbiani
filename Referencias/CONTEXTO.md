@@ -1,6 +1,6 @@
 # CONTEXTO.md — Árbol Biani
 
-Última actualización: 2026-08-14 — por Codex
+Última actualización: 2026-09-02 — por Codex
 
 ## Qué es
 
@@ -38,10 +38,10 @@ Archivo Familiar conserva todas las operaciones de edición.
 - **Estado independiente por formulario de vínculo** → los selectores de progenitor, hijo/a y cónyuge no comparten una selección.
   → descartado: reutilizar un único `selectedPersonId`, que podía preseleccionar una relación distinta por error.
 
-- **Árbol global con raíz técnica por componente** → `family-chart` necesita una persona principal. La raíz invisible conecta sólo una ancla por componente familiar, nunca a todas las personas sin padres. Conectar a ambos cónyuges como hijos de esa raíz hacía que la biblioteca recorriera los hijos comunes por dos caminos y duplicara fichas y vínculos.
-  → resuelta: la capa `lib/arbol-chart.ts` normaliza antes de agrupar `parents`, `children` y `spouses` en ambos sentidos, conserva hermanos como dato derivado del panel y selecciona una ancla determinista por componente. La preferencia es: raíz sin padres con descendencia; luego cualquier persona con filiación; y sólo si el componente no tiene ninguna filiación, una persona conectada exclusivamente por pareja. Entre raíces posibles se prioriza la que alcanza más descendencia por `children`, porque ése es el recorrido direccional que realiza `family-chart`. El enlace técnico raíz→ancla no es una filiación real ni se expone en la UI.
+- **Grafo canónico separado del bosque de layout** → la aplicación normaliza todas las filas de Supabase como filiaciones dirigidas `progenitor → hijo` y cónyuges bidireccionales. Los componentes se calculan sobre ambos tipos de vínculo y pueden conservar varias raíces ancestrales.
+  → `family-chart` sólo puede posicionar una jerarquía y no recorre los padres de un cónyuge que agrega lateralmente. Por eso recibe un bosque técnico determinista: cada persona tiene un único camino de posicionamiento, una pareja se adjunta una sola vez y cada componente puede aportar varias raíces a la raíz invisible global. Las filiaciones secundarias y todos los matrimonios se dibujan después desde el grafo canónico, una sola vez por vínculo. El bosque no modifica ni reemplaza relaciones persistidas.
 
-- **Layout estable por orden determinista** → personas, hijos y cónyuges se ordenan por fecha de nacimiento disponible, apellido, nombre e id. Seleccionar una persona centra con pan sin cambiar la persona principal del layout.
+- **Layout estable por orden determinista** → personas, raíces, hijos y cónyuges se ordenan por fecha de nacimiento disponible, apellido, nombre e id. Cuando un hijo tiene dos progenitores se elige sólo un progenitor técnico para posicionarlo, priorizando la rama de mayor profundidad conocida; las dos filiaciones reales siguen dibujadas. Seleccionar una persona centra con pan sin cambiar el layout.
   → resuelta: la vista por defecto usa `treeFit` para encuadrar todo el mapa; no centra el ego.
   → resuelta: la disposición no se reconstruye durante la navegación y mantiene el mismo orden relativo al volver a cargar datos.
 
@@ -75,8 +75,8 @@ Archivo Familiar conserva todas las operaciones de edición.
 - Implementado: autenticación, personas (crear, editar y eliminar), relaciones de filiación y cónyuge, con validaciones de integridad.
 - Implementado: Archivo Familiar en grilla con búsqueda local; cualquier zona de una tarjeta abre un drawer lateral con la ficha única de la persona para editar datos personales, relaciones, notas, documentos y, al final, eliminarla si no conserva referencias. Se eliminaron lápiz y tacho de cada tarjeta para evitar entradas de edición contradictorias. La ficha muestra además un resumen de Bitácora asociado, de solo lectura.
 - Implementado: Bitácora MVP con entradas de nota, hipótesis, duda, hallazgo, tarea pendiente y documento pendiente; texto libre, asociación opcional a persona, filtros por tipo/persona y CRUD completo.
-- Implementado: Árbol de datos reales de Supabase con `family-chart`; muestra filiación vertical, parejas horizontales y hermanos derivados en el panel de lectura. En desarrollo registra el `main_id` técnico, las anclas que éste entrega a `family-chart`, su coincidencia con la auditoría y el conteo de tarjetas realmente visibles en el DOM, además de reportar reciprocidades faltantes.
-- Implementado: regresión de integración a escala con 36 personas sintéticas, cuatro líneas de sangre, matrimonios múltiples, medios hermanos y parejas sin filiación. Comprueba auditoría completa, anclas de sangre y una tarjeta única por persona antes de ampliar la carga real.
+- Implementado: Árbol de datos reales de Supabase con lectura paginada de personas, filiaciones y cónyuges; muestra todas las relaciones normalizadas, parejas horizontales y hermanos derivados en el panel de lectura. En desarrollo registra raíces de layout, componentes, ciclos o referencias inválidas, tarjetas visibles y cantidad de vínculos dibujados.
+- Implementado: regresiones con dos ascendencias completas unidas por matrimonio, tres ramas conyugales conectadas, personas aisladas, creación equivalente desde Padres/Hijos, paginación, ciclos, recarga determinista y una integración a escala de 36 personas con matrimonios múltiples y medios hermanos.
 - Implementado: interacción del Árbol con pan, zoom por rueda/pellizco y botones, **Ver todo**, detalle de fichas según zoom, selección y recentrado sin reordenar.
 - Implementado: panel de lectura con fechas/lugar existentes y accesos clickeables a padres/madres, hijos/as, cónyuges/parejas y hermanos/as; no muestra datos ausentes como alarmas.
 - Verificación manual: `Referencias/PRUEBAS-MANUALES.md` incluye relaciones, documentos y mapa del Árbol.
@@ -84,15 +84,19 @@ Archivo Familiar conserva todas las operaciones de edición.
 
 ## Casos borde conocidos
 
-- Grupos familiares desconectados se disponen bajo una raíz técnica invisible con una única ancla por grupo; sus líneas falsas se ocultan y no se presentan como parentescos. Una persona sólo vinculada por pareja no puede ser ancla mientras haya en su componente alguien con filiación; una persona sin vínculos forma un componente de una persona y aparece como nodo aislado.
+- Grupos familiares desconectados se disponen bajo una raíz técnica invisible. Un componente puede aportar varias raíces de layout cuando sus ramas se unen lateralmente; sus líneas técnicas se ocultan y no se presentan como parentescos. Una persona sin vínculos forma un componente de una persona y aparece como nodo aislado.
 - Personas sin fecha de nacimiento se ordenan de forma determinista por apellido, nombre e id para evitar saltos visuales.
 - Las líneas de hermanos no se dibujan como una relación propia: la filiación compartida expresa ese vínculo. No se diferencia visualmente hermano completo de medio hermano por ahora.
 - Un cónyuge sin otras personas cargadas solo aparece como pareja; el Árbol nunca inventa ni carga parientes externos.
 
-## Problemas abiertos
+## Diagnóstico de vínculos — 2026-09-02
 
-- [Resuelto y validado en la transformación] Layout del Árbol: la causa era una raíz técnica que entregaba a `family-chart` dos cónyuges como ramas paralelas, mientras ambos declaraban los mismos hijos. La entrada ahora mantiene reciprocidad y una única ancla por componente, por lo que hijos, hermanos y parejas se calculan desde las relaciones reales sin nodos duplicados.
-- [Resuelto y validado — 2026-08-13] Cobertura y layout del Árbol: el caso que destapó la causa usaba 11 personas reales, todas alcanzables en el JSON, pero la única ancla era Yamil Vozzi (`eb13f625-d872-4ddd-a536-4ed230a22e68`), una persona sin padres ni hijos vinculada sólo por matrimonio. `family-chart` parte de `children` desde el ancla y sólo podía dibujar a Yamil y a su cónyuge. La selección ahora exige primero una raíz de sangre con descendencia, después cualquier filiación y deja la ancla exclusivamente conyugal para componentes sin sangre. Con ese conjunto, Giusseppe Biani (`4d73b14d-5b01-409d-9c4f-e531531dab17`) queda como ancla, `family-chart` calcula 11 nodos únicos y la comprobación de DOM cuenta 11 tarjetas visibles. Se agregaron pruebas automáticas para el caso real, cuatro componentes simultáneos y su fusión por matrimonio, además de los tres casos manuales de regresión.
+- [Resuelto en código] La consulta no filtraba por apellido y la orientación `padre_id → hijo_id` era consistente. La causa concreta estaba en la representación: se elegía una única ancla por componente y `family-chart` sólo recorría descendientes desde ella. Al agregar un cónyuge lateral, la biblioteca no continuaba por los padres de ese cónyuge. El caso mínimo de dos parejas con padres y abuelos reproducía la pérdida: 6 personas normalizadas, 4 renderizadas y 2 ancestros de la rama lateral omitidos.
+- [Resuelto en código] `lib/arbol-chart.ts` separa el grafo real del bosque técnico, permite raíces múltiples, mantiene una sola tarjeta por persona, deduplica vínculos y diagnostica auto-referencias, más de dos progenitores, referencias ausentes y ciclos. `components/arbol/arbol-client.tsx` dibuja las relaciones reales desde ese grafo y no desde los atajos de layout de la biblioteca.
+- [Resuelto en código] `lib/relaciones.ts` pagina las tres tablas y normaliza cada fila canónica en reciprocidad funcional. La ficha ya enviaba los mismos campos canónicos tanto desde Padres como desde Hijos; ahora existe una regresión automática que lo verifica.
+- [Pendiente de auditoría autenticada] La lectura directa con la clave anónima quedó bloqueada por RLS y devolvió cero filas, por lo que no se inspeccionaron ni corrigieron silenciosamente las 86 personas ni sus relaciones. Al abrir `/arbol` con sesión válida, la auditoría de desarrollo informa cualquier id con ciclo, referencia inválida o exceso de progenitores. Si aparece alguno, debe repararse desde Archivo Familiar o mediante una migración revisada caso por caso, nunca por una limpieza automática.
+
+## Problemas abiertos
 - [Resuelto] Confirmaciones nativas: se reemplazaron todos los usos de `window.confirm()` y `window.alert()` por diálogos visuales propios reutilizables (`ConfirmDialog` y `NoticeDialog`). Si la integridad referencial bloquea borrar una persona, el mensaje se muestra en `NoticeDialog`, no en un diálogo del navegador.
 - Diseñar un visor documental más rico (zoom y paginación) si el uso de actas escaneadas lo exige, sin recargar la ficha.
 - Evaluar un campo opcional de fotografía o retrato para personas; no debe convertirse en requisito ni en señal de información faltante.

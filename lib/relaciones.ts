@@ -10,21 +10,62 @@ import type {
   VinculoFiliacionFicha,
 } from "@/lib/supabase/types";
 
+interface FilaFiliacionArbol {
+  id?: string;
+  padre_id: string;
+  hijo_id: string;
+}
+
+interface FilaConyugeArbol {
+  id?: string;
+  persona1_id: string;
+  persona2_id: string;
+}
+
+interface PaginaSupabase<T> {
+  data: T[] | null;
+  error: { message: string } | null;
+}
+
+const TAMANIO_PAGINA_ARBOL = 1000;
+
+export async function obtenerTodasLasFilas<T>(
+  obtenerPagina: (desde: number, hasta: number) => PromiseLike<PaginaSupabase<T>>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const data: T[] = [];
+  for (let desde = 0; ; desde += TAMANIO_PAGINA_ARBOL) {
+    const pagina = await obtenerPagina(desde, desde + TAMANIO_PAGINA_ARBOL - 1);
+    if (pagina.error) return { data, error: pagina.error };
+    const filas = pagina.data ?? [];
+    data.push(...filas);
+    if (filas.length < TAMANIO_PAGINA_ARBOL) return { data, error: null };
+  }
+}
+
 export async function getPersonasArbol(): Promise<PersonaArbol[]> {
   const supabase = await createClient();
   const [personasData, filiacionesData, conyugesData] = await Promise.all([
-    supabase
+    obtenerTodasLasFilas<Persona>((desde, hasta) => supabase
       .from("personas")
       .select("*")
       .order("apellido", { ascending: true })
       .order("nombre", { ascending: true })
-      .order("id", { ascending: true }),
-    supabase
+      .order("id", { ascending: true })
+      .range(desde, hasta)),
+    obtenerTodasLasFilas<FilaFiliacionArbol>((desde, hasta) => supabase
       .from("relaciones_filiacion")
-      .select("padre_id, hijo_id"),
-    supabase
+      .select("id, padre_id, hijo_id")
+      .order("padre_id", { ascending: true })
+      .order("hijo_id", { ascending: true })
+      .order("id", { ascending: true })
+      .range(desde, hasta)),
+    obtenerTodasLasFilas<FilaConyugeArbol>((desde, hasta) => supabase
       .from("relaciones_conyuge")
-      .select("persona1_id, persona2_id"),
+      .select("id, persona1_id, persona2_id")
+      .order("persona1_id", { ascending: true })
+      .order("persona2_id", { ascending: true })
+      .order("id", { ascending: true })
+      .range(desde, hasta)),
   ]);
 
   const error = personasData.error || filiacionesData.error || conyugesData.error;
@@ -33,16 +74,20 @@ export async function getPersonasArbol(): Promise<PersonaArbol[]> {
     throw new Error("No se pudo cargar el árbol familiar.");
   }
 
-  const personas = (personasData.data ?? []) as Persona[];
+  return normalizarPersonasArbol(personasData.data, filiacionesData.data, conyugesData.data);
+}
+
+export function normalizarPersonasArbol(
+  personas: Persona[],
+  filiaciones: FilaFiliacionArbol[],
+  conyuges: FilaConyugeArbol[],
+): PersonaArbol[] {
   const ids = new Set(personas.map((persona) => persona.id));
   const padresPorHijo = new Map<string, Set<string>>();
   const hijosPorPadre = new Map<string, Set<string>>();
   const conyugesPorPersona = new Map<string, Set<string>>();
 
-  for (const fila of (filiacionesData.data ?? []) as {
-    padre_id: string;
-    hijo_id: string;
-  }[]) {
+  for (const fila of filiaciones) {
     if (!ids.has(fila.padre_id) || !ids.has(fila.hijo_id)) continue;
     if (!padresPorHijo.has(fila.hijo_id)) padresPorHijo.set(fila.hijo_id, new Set());
     if (!hijosPorPadre.has(fila.padre_id)) hijosPorPadre.set(fila.padre_id, new Set());
@@ -50,10 +95,7 @@ export async function getPersonasArbol(): Promise<PersonaArbol[]> {
     hijosPorPadre.get(fila.padre_id)?.add(fila.hijo_id);
   }
 
-  for (const fila of (conyugesData.data ?? []) as {
-    persona1_id: string;
-    persona2_id: string;
-  }[]) {
+  for (const fila of conyuges) {
     if (!ids.has(fila.persona1_id) || !ids.has(fila.persona2_id)) continue;
     if (!conyugesPorPersona.has(fila.persona1_id)) conyugesPorPersona.set(fila.persona1_id, new Set());
     if (!conyugesPorPersona.has(fila.persona2_id)) conyugesPorPersona.set(fila.persona2_id, new Set());

@@ -33,7 +33,21 @@ function cargarModulo(archivoRelativo, dependencias = {}) {
   return modulo.exports;
 }
 
-const { compararHijosParaLayout, crearDatosFamilyChart, crearModeloArbol, diagnosticarDatosFamilyChart, GEOMETRIA_ARBOL, ordenarConyugesParaLayout, RAIZ_MAPA_ID } = cargarTransformador();
+const {
+  compararHijosParaLayout,
+  crearDatosFamilyChart,
+  crearModeloArbol,
+  crearVinculosVisualesArbol,
+  diagnosticarDatosFamilyChart,
+  diagnosticarModeloArbol,
+  GEOMETRIA_ARBOL,
+  ordenarConyugesParaLayout,
+  RAIZ_MAPA_ID,
+} = cargarTransformador();
+const { normalizarPersonasArbol, obtenerTodasLasFilas } = cargarModulo("lib/relaciones.ts", {
+  "@/lib/supabase/server": {},
+  "@/lib/personas": {},
+});
 
 function persona(id, { padres = [], hijos = [], conyuges = [], nacimiento = "1950-01-01" } = {}) {
   return {
@@ -53,17 +67,6 @@ function persona(id, { padres = [], hijos = [], conyuges = [], nacimiento = "195
     conyuges_ids: conyuges,
     hermanos_ids: [],
   };
-}
-
-function personasDesdeDatos(datos) {
-  return datos
-    .filter((dato) => dato.id !== RAIZ_MAPA_ID)
-    .map((dato) => persona(dato.id, {
-      padres: dato.rels.parents,
-      hijos: dato.rels.children,
-      conyuges: dato.rels.spouses,
-      nacimiento: dato.data.orden?.slice(0, 10) === "9999-99-99" ? "9999-01-01" : dato.data.orden?.slice(0, 10),
-    }));
 }
 
 function calcularArbol(datos) {
@@ -90,81 +93,157 @@ function componente(modelo, id) {
   return encontrado;
 }
 
-test("regresión: un cónyuge sin sangre no puede ganar el ancla del árbol real", () => {
-  const diagnostico = JSON.parse(readFileSync(resolve(raiz, "Referencias/diagnostico-family-chart-datos-reales.json"), "utf8"));
-  const personas = personasDesdeDatos(diagnostico.datosFamilyChart);
-  const modelo = crearModeloArbol(personas);
-  const yamil = "eb13f625-d872-4ddd-a536-4ed230a22e68";
-  const giusseppe = "4d73b14d-5b01-409d-9c4f-e531531dab17";
+function personaPersistida(id, nacimiento = "1950-01-01") {
+  const { padres_ids, hijos_ids, conyuges_ids, hermanos_ids, ...persistida } = persona(id, { nacimiento });
+  return persistida;
+}
 
-  assert.equal(diagnostico.datosFamilyChart[0].rels.children[0], yamil, "el archivo de diagnóstico conserva la ancla defectuosa original");
-  assert.equal(modelo.componentes.length, 1);
-  assert.equal(modelo.componentes[0].ancla, giusseppe);
-  assert.equal(modelo.componentes[0].criterioAncla, "raiz-con-descendencia");
-  assert.notEqual(modelo.componentes[0].ancla, yamil);
-
-  const datos = crearDatosFamilyChart(personas);
-  assert.equal(datos[0].rels.children[0], giusseppe);
-  const renderizados = idsRenderizados(datos);
-  assert.equal(new Set(renderizados).size, 11);
-  assert.deepEqual(new Set(renderizados), new Set(personas.map(({ id }) => id)));
-});
-
-test("cuatro componentes conservan una sola ancla por componente y todos se renderizan", () => {
+test("dos cónyuges con padres y abuelos propios conservan ambas ascendencias", () => {
   const personas = [
-    persona("a-raiz", { hijos: ["a-hija"], nacimiento: "1900-01-01" }),
-    persona("a-hija", { padres: ["a-raiz"], conyuges: ["a-pareja"], nacimiento: "1930-01-01" }),
-    persona("a-pareja", { conyuges: ["a-hija"], nacimiento: "1931-01-01" }),
-    persona("b-raiz", { hijos: ["b-hijo"], nacimiento: "1910-01-01" }),
-    persona("b-hijo", { padres: ["b-raiz"], nacimiento: "1940-01-01" }),
-    persona("c-raiz", { hijos: ["c-hija"], nacimiento: "1920-01-01" }),
-    persona("c-hija", { padres: ["c-raiz"], nacimiento: "1950-01-01" }),
-    persona("d-uno", { conyuges: ["d-dos"], nacimiento: "1960-01-01" }),
-    persona("d-dos", { conyuges: ["d-uno"], nacimiento: "1961-01-01" }),
+    persona("a-abuelo", { hijos: ["a-padre"], nacimiento: "1900-01-01" }),
+    persona("a-padre", { padres: ["a-abuelo"], hijos: ["a"], nacimiento: "1925-01-01" }),
+    persona("a", { padres: ["a-padre"], conyuges: ["b"], nacimiento: "1950-01-01" }),
+    persona("b-abuelo", { hijos: ["b-padre"], nacimiento: "1901-01-01" }),
+    persona("b-padre", { padres: ["b-abuelo"], hijos: ["b"], nacimiento: "1926-01-01" }),
+    persona("b", { padres: ["b-padre"], conyuges: ["a"], nacimiento: "1951-01-01" }),
   ];
   const modelo = crearModeloArbol(personas);
+  const datos = crearDatosFamilyChart(personas);
+  const renderizados = idsRenderizados(datos);
 
-  assert.equal(modelo.componentes.length, 4);
+  assert.equal(modelo.componentes.length, 1);
+  assert.deepEqual(new Set(modelo.componentes[0].raicesAncestrales), new Set(["a-abuelo", "b-abuelo"]));
+  assert.deepEqual(new Set(datos[0].rels.children), new Set(["a-abuelo", "b-abuelo"]));
+  assert.equal(renderizados.length, personas.length);
+  assert.deepEqual(new Set(renderizados), new Set(personas.map(({ id }) => id)));
   assert.deepEqual(
-    modelo.componentes.map(({ ancla, criterioAncla }) => ({ ancla, criterioAncla })).sort((a, b) => a.ancla.localeCompare(b.ancla)),
-    [
-      { ancla: "a-raiz", criterioAncla: "raiz-con-descendencia" },
-      { ancla: "b-raiz", criterioAncla: "raiz-con-descendencia" },
-      { ancla: "c-raiz", criterioAncla: "raiz-con-descendencia" },
-      { ancla: "d-uno", criterioAncla: "solo-conyugal" },
-    ],
+    new Set(crearVinculosVisualesArbol(modelo).map(({ id }) => id)),
+    new Set([
+      "filiacion:a-abuelo:a-padre",
+      "filiacion:a-padre:a",
+      "filiacion:b-abuelo:b-padre",
+      "filiacion:b-padre:b",
+      "conyugal:a:b",
+    ]),
   );
-  const renderizados = idsRenderizados(crearDatosFamilyChart(personas));
+});
+
+test("tres ramas conectadas por matrimonios forman un componente sin perder raíces", () => {
+  const personas = [
+    persona("a-raiz", { hijos: ["a"], nacimiento: "1900-01-01" }),
+    persona("a", { padres: ["a-raiz"], conyuges: ["b"], nacimiento: "1930-01-01" }),
+    persona("b-raiz", { hijos: ["b"], nacimiento: "1901-01-01" }),
+    persona("b", { padres: ["b-raiz"], conyuges: ["a", "c"], nacimiento: "1931-01-01" }),
+    persona("c-raiz", { hijos: ["c"], nacimiento: "1902-01-01" }),
+    persona("c", { padres: ["c-raiz"], conyuges: ["b"], nacimiento: "1932-01-01" }),
+  ];
+  const modelo = crearModeloArbol(personas);
+  const datos = crearDatosFamilyChart(personas);
+  const renderizados = idsRenderizados(datos);
+
+  assert.equal(modelo.componentes.length, 1);
+  assert.deepEqual(new Set(modelo.componentes[0].raicesAncestrales), new Set(["a-raiz", "b-raiz", "c-raiz"]));
+  assert.equal(renderizados.length, personas.length);
   assert.equal(new Set(renderizados).size, personas.length);
   assert.deepEqual(new Set(renderizados), new Set(personas.map(({ id }) => id)));
+  assert.equal(crearVinculosVisualesArbol(modelo).filter(({ tipo }) => tipo === "conyugal").length, 2);
 });
 
-test("al fusionar por matrimonio, dos componentes se vuelven uno sin anclas residuales ni personas perdidas", () => {
-  const separadas = [
-    persona("alfa-raiz", { hijos: ["alfa-hija"], nacimiento: "1900-01-01" }),
-    persona("alfa-hija", { padres: ["alfa-raiz"], nacimiento: "1930-01-01" }),
-    persona("beta", { nacimiento: "1932-01-01" }),
+test("personas realmente no vinculadas siguen como componentes y tarjetas separadas", () => {
+  const personas = [
+    persona("familia-raiz", { hijos: ["familia-hija"], nacimiento: "1900-01-01" }),
+    persona("familia-hija", { padres: ["familia-raiz"], nacimiento: "1930-01-01" }),
+    persona("suelta-uno", { nacimiento: "1960-01-01" }),
+    persona("suelta-dos", { nacimiento: "1961-01-01" }),
+    persona("suelta-tres", { nacimiento: "1962-01-01" }),
   ];
-  const modeloSeparado = crearModeloArbol(separadas);
-  assert.equal(modeloSeparado.componentes.length, 2);
-  assert.equal(componente(modeloSeparado, "alfa-raiz").ancla, "alfa-raiz");
-  assert.equal(componente(modeloSeparado, "beta").ancla, "beta");
+  const modelo = crearModeloArbol(personas);
+  const datos = crearDatosFamilyChart(personas);
 
-  const fusionadas = [
-    persona("alfa-raiz", { hijos: ["alfa-hija"], nacimiento: "1900-01-01" }),
-    persona("alfa-hija", { padres: ["alfa-raiz"], conyuges: ["beta"], nacimiento: "1930-01-01" }),
-    persona("beta", { conyuges: ["alfa-hija"], nacimiento: "1932-01-01" }),
-  ];
-  const modeloFusionado = crearModeloArbol(fusionadas);
-  assert.equal(modeloFusionado.componentes.length, 1);
-  assert.equal(modeloFusionado.componentes[0].ancla, "alfa-raiz");
-  assert.deepEqual(crearDatosFamilyChart(fusionadas)[0].rels.children, ["alfa-raiz"]);
-  const renderizados = idsRenderizados(crearDatosFamilyChart(fusionadas));
-  assert.equal(new Set(renderizados).size, fusionadas.length);
-  assert.deepEqual(new Set(renderizados), new Set(fusionadas.map(({ id }) => id)));
+  assert.equal(modelo.componentes.length, 4);
+  assert.deepEqual(new Set(datos[0].rels.children), new Set(["familia-raiz", "suelta-uno", "suelta-dos", "suelta-tres"]));
+  assert.deepEqual(new Set(idsRenderizados(datos)), new Set(personas.map(({ id }) => id)));
 });
 
-test("si el ancla deja de ser válida, se recalcula tras desvincular y se bloquea su borrado mientras conserva la filiación", async () => {
+test("una fila canónica creada desde Padres o desde Hijos produce la misma reciprocidad funcional", () => {
+  const personasBase = [personaPersistida("progenitor", "1920-01-01"), personaPersistida("hijo", "1950-01-01")];
+  const filaCreadaDesdePadres = [{ id: "rel-1", padre_id: "progenitor", hijo_id: "hijo" }];
+  const filaCreadaDesdeHijos = [{ id: "rel-2", padre_id: "progenitor", hijo_id: "hijo" }];
+  const desdePadres = normalizarPersonasArbol(personasBase, filaCreadaDesdePadres, []);
+  const desdeHijos = normalizarPersonasArbol(personasBase, filaCreadaDesdeHijos, []);
+
+  assert.deepEqual(desdePadres, desdeHijos);
+  assert.deepEqual(desdePadres.find(({ id }) => id === "progenitor")?.hijos_ids, ["hijo"]);
+  assert.deepEqual(desdePadres.find(({ id }) => id === "hijo")?.padres_ids, ["progenitor"]);
+  assert.deepEqual(crearDatosFamilyChart(desdePadres), crearDatosFamilyChart(desdeHijos));
+
+  const ficha = readFileSync(resolve(raiz, "components/archivo/persona-ficha-client.tsx"), "utf8");
+  assert.match(ficha, /agregarFiliacion\(\{\s*padre_id:\s*padreElegido,\s*hijo_id:\s*persona\.id\s*\}\)/);
+  assert.match(ficha, /agregarFiliacion\(\{\s*padre_id:\s*persona\.id,\s*hijo_id:\s*hijoElegido\s*\}\)/);
+});
+
+test("la lectura paginada no descarta filas de relaciones", async () => {
+  const filas = Array.from({ length: 1003 }, (_, indice) => ({ id: `fila-${indice}` }));
+  const rangos = [];
+  const resultado = await obtenerTodasLasFilas(async (desde, hasta) => {
+    rangos.push([desde, hasta]);
+    return { data: filas.slice(desde, hasta + 1), error: null };
+  });
+
+  assert.equal(resultado.error, null);
+  assert.equal(resultado.data.length, filas.length);
+  assert.deepEqual(rangos, [[0, 999], [1000, 1999]]);
+});
+
+test("los ciclos existentes se diagnostican y un alta que cerraría un ciclo se bloquea", async () => {
+  const personasConCiclo = [
+    persona("a", { padres: ["c"], hijos: ["b"] }),
+    persona("b", { padres: ["a"], hijos: ["c"] }),
+    persona("c", { padres: ["b"], hijos: ["a"] }),
+  ];
+  const diagnostico = diagnosticarModeloArbol(personasConCiclo);
+  const datos = crearDatosFamilyChart(personasConCiclo);
+
+  assert.equal(diagnostico.errores.filter(({ codigo }) => codigo === "ciclo-filiacion").length, 1);
+  assert.equal(idsRenderizados(datos).length, personasConCiclo.length);
+  assert.equal(new Set(idsRenderizados(datos)).size, personasConCiclo.length);
+
+  let inserto = false;
+  const padresPorHijo = new Map([["c", ["b"]], ["b", ["a"]]]);
+  const { agregarFiliacion } = cargarModulo("lib/relaciones-actions.ts", {
+    "next/cache": { revalidatePath: () => {} },
+    "@/lib/supabase/server": {
+      createClient: async () => ({
+        from: () => ({
+          select: (_columnas, opciones) => opciones?.head
+            ? { eq: async () => ({ count: 0, error: null }) }
+            : { in: async (_columna, ids) => ({ data: ids.flatMap((id) => (padresPorHijo.get(id) ?? []).map((padre_id) => ({ padre_id }))), error: null }) },
+          insert: async () => { inserto = true; return { error: null }; },
+        }),
+      }),
+    },
+    "@/lib/relaciones": {},
+  });
+  const resultado = await agregarFiliacion({ padre_id: "c", hijo_id: "a" });
+  assert.match(resultado.error, /ciclo/i);
+  assert.equal(inserto, false);
+});
+
+test("el layout es determinista al recalcularse como en una recarga", () => {
+  const personas = [
+    persona("raiz-a", { hijos: ["a"] }),
+    persona("a", { padres: ["raiz-a"], conyuges: ["b"] }),
+    persona("raiz-b", { hijos: ["b"] }),
+    persona("b", { padres: ["raiz-b"], conyuges: ["a"] }),
+  ];
+  const primera = crearDatosFamilyChart(structuredClone(personas));
+  const segunda = crearDatosFamilyChart(structuredClone(personas));
+
+  assert.deepEqual(primera, segunda);
+  assert.deepEqual(idsRenderizados(primera), idsRenderizados(segunda));
+});
+
+test("al desvincular o borrar se recalculan las raíces sin perder el resto del componente", async () => {
   const conFiliacion = [
     persona("a", { hijos: ["b"], nacimiento: "1900-01-01" }),
     persona("b", { padres: ["a"], hijos: ["c"], nacimiento: "1930-01-01" }),
@@ -172,7 +251,7 @@ test("si el ancla deja de ser válida, se recalcula tras desvincular y se bloque
     persona("d", { padres: ["c"], nacimiento: "1990-01-01" }),
   ];
 
-  assert.equal(componente(crearModeloArbol(conFiliacion), "a").ancla, "a");
+  assert.deepEqual(componente(crearModeloArbol(conFiliacion), "a").raicesAncestrales, ["a"]);
 
   let seIntentoBorrarEnBase = false;
   const { eliminarPersona } = cargarModulo("lib/personas-actions.ts", {
@@ -202,8 +281,7 @@ test("si el ancla deja de ser válida, se recalcula tras desvincular y se bloque
   ];
   const modeloSinFiliacionAB = crearModeloArbol(sinFiliacionAB);
   const componenteB = componente(modeloSinFiliacionAB, "b");
-  assert.equal(componenteB.ancla, "b");
-  assert.equal(componenteB.criterioAncla, "raiz-con-descendencia");
+  assert.deepEqual(componenteB.raicesAncestrales, ["b"]);
   assert.deepEqual(new Set(componenteB.ids), new Set(["b", "c", "d"]));
   const renderizadosSinFiliacion = idsRenderizados(crearDatosFamilyChart(sinFiliacionAB));
   assert.equal(new Set(renderizadosSinFiliacion).size, sinFiliacionAB.length, "no debe haber tarjetas duplicadas");
@@ -212,8 +290,7 @@ test("si el ancla deja de ser válida, se recalcula tras desvincular y se bloque
   const sinA = sinFiliacionAB.filter(({ id }) => id !== "a");
   const modeloSinA = crearModeloArbol(sinA);
   assert.equal(modeloSinA.componentes.length, 1);
-  assert.equal(modeloSinA.componentes[0].ancla, "b");
-  assert.equal(modeloSinA.componentes[0].criterioAncla, "raiz-con-descendencia");
+  assert.deepEqual(modeloSinA.componentes[0].raicesAncestrales, ["b"]);
   const renderizadosSinA = idsRenderizados(crearDatosFamilyChart(sinA));
   assert.equal(new Set(renderizadosSinA).size, sinA.length, "no debe haber tarjetas duplicadas tras borrar A");
   assert.deepEqual(new Set(renderizadosSinA), new Set(sinA.map(({ id }) => id)), "el resto del componente debe seguir completo tras borrar A");
@@ -285,7 +362,7 @@ test("la importación del Excel inserta sólo personas propuestas y no crea rela
   assert.equal(personasInsertadas.every((persona) => persona.genero === "no_definido"), true);
 });
 
-test("integración a escala: cuatro líneas de sangre conservan cobertura, anclas y tarjetas únicas", () => {
+test("integración a escala: cuatro líneas de sangre conservan cobertura, raíces y tarjetas únicas", () => {
   const personas = [
     // Línea A: cuatro generaciones y tres personas presentes sólo por pareja.
     persona("a-raiz", { hijos: ["a-hija", "a-hijo"], nacimiento: "1900-01-01" }),
@@ -331,29 +408,34 @@ test("integración a escala: cuatro líneas de sangre conservan cobertura, ancla
     persona("d-pareja-bisnieto", { conyuges: ["d-bisnieto"], nacimiento: "1986-01-01" }),
     persona("d-pareja-bisnieta", { conyuges: ["d-bisnieta"], nacimiento: "1989-01-01" }),
   ];
-  const anclasEsperadas = new Set(["a-raiz", "b-raiz", "c-raiz", "d-raiz"]);
+  const raicesLayoutEsperadas = new Set(["a-raiz", "b-raiz", "c-raiz", "d-raiz"]);
   const soloPorPareja = new Set(["a-pareja-hijo", "a-pareja-bisnieto", "a-pareja-bisnieta", "d-pareja-hija", "d-pareja-bisnieto", "d-pareja-bisnieta"]);
 
   assert.equal(personas.length, 36);
   const modelo = crearModeloArbol(personas);
   assert.equal(modelo.componentes.length, 4);
-  assert.deepEqual(new Set(modelo.componentes.map(({ ancla }) => ancla)), anclasEsperadas);
-  modelo.componentes.forEach(({ ancla, criterioAncla }) => {
-    assert.equal(criterioAncla, "raiz-con-descendencia");
-    assert.equal(soloPorPareja.has(ancla), false, "una persona sólo conyugal no puede reemplazar a una raíz de sangre");
-  });
+  assert.deepEqual(
+    new Set(modelo.componentes.flatMap(({ raicesAncestrales }) => raicesAncestrales)),
+    new Set(["a-raiz", "b-raiz", "b-pareja", "b-pareja-uno", "b-pareja-dos", "c-raiz", "c-pareja-uno", "c-pareja-dos", "d-raiz"]),
+  );
+  assert.equal(modelo.componentes.flatMap(({ raicesAncestrales }) => raicesAncestrales).some((id) => soloPorPareja.has(id)), false);
 
   const datos = crearDatosFamilyChart(personas);
   const auditoria = diagnosticarDatosFamilyChart(datos);
+  const auditoriaModelo = diagnosticarModeloArbol(personas);
   assert.deepEqual(auditoria.errores, []);
+  assert.deepEqual(auditoriaModelo.errores, []);
   assert.equal(auditoria.cantidadPersonas, 36);
   assert.equal(auditoria.cantidadAlcanzables, 36);
   assert.deepEqual(auditoria.faltantes, []);
+  assert.deepEqual(new Set(auditoria.raicesLayout), raicesLayoutEsperadas);
   assert.deepEqual(
     new Set(datos.filter((dato) => dato.data.sinLineaSangre).map((dato) => dato.id)),
     soloPorPareja,
     "la marca visual debe derivarse sólo para parejas sin filiación propia",
   );
+  const vinculos = crearVinculosVisualesArbol(modelo);
+  assert.equal(new Set(vinculos.map(({ id }) => id)).size, vinculos.length, "cada línea real debe generarse una sola vez");
 
   const renderizados = idsRenderizados(datos);
   assert.equal(renderizados.length, personas.length, "family-chart debe crear exactamente una tarjeta por persona");

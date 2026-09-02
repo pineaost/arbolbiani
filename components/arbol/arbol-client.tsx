@@ -5,7 +5,18 @@ import { Minus, Move, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { SakuraBackdrop } from "@/components/arbol/sakura-backdrop";
-import { compararHijosParaLayout, crearDatosFamilyChart, diagnosticarDatosFamilyChart, GEOMETRIA_ARBOL, ordenarConyugesParaLayout, RAIZ_MAPA_ID } from "@/lib/arbol-chart";
+import {
+  compararHijosParaLayout,
+  crearDatosFamilyChart,
+  crearModeloArbol,
+  crearVinculosVisualesArbol,
+  diagnosticarDatosFamilyChart,
+  diagnosticarModeloArbol,
+  GEOMETRIA_ARBOL,
+  ordenarConyugesParaLayout,
+  RAIZ_MAPA_ID,
+} from "@/lib/arbol-chart";
+import type { VinculoVisualArbol } from "@/lib/arbol-chart";
 import type { PersonaArbol } from "@/lib/supabase/types";
 
 type FamilyChart = ReturnType<(typeof import("family-chart"))["createChart"]>;
@@ -22,21 +33,63 @@ const variablesGeometriaArbol = {
   "--arbol-nodo-alto": `${GEOMETRIA_ARBOL.altoNodo}px`,
 } as CSSProperties;
 
-// Convierte el trazo recto/ortogonal que entrega family-chart en una curva
-// suave tipo d3.linkVertical: mismos puntos de entrada y salida, con un
-// control en el punto medio vertical entre ambos. Es puramente estético
-// -no toca relaciones, ids ni datos- y se recalcula en cada render porque
-// se deriva sólo de las coordenadas visibles del propio trazo. Para
-// vínculos casi horizontales (cónyuges) el resultado da, por cálculo, una
-// curva casi recta: no hace falta distinguir el tipo de relación.
-function suavizarTrazoVinculo(path: SVGPathElement) {
-  const numeros = path.getAttribute("d")?.match(/-?\d+(?:\.\d+)?/g);
-  if (!numeros || numeros.length < 4) return;
-  const [x1, y1] = numeros.slice(0, 2).map(Number);
-  const [x2, y2] = numeros.slice(-2).map(Number);
-  if ([x1, y1, x2, y2].some((valor) => Number.isNaN(valor))) return;
-  const yMedio = (y1 + y2) / 2;
-  path.setAttribute("d", `M${x1},${y1} C${x1},${yMedio} ${x2},${yMedio} ${x2},${y2}`);
+interface NodoPosicionado {
+  data: { id: string };
+  x: number;
+  y: number;
+}
+
+function puntoEnBorde(origen: NodoPosicionado, destino: NodoPosicionado) {
+  const dx = destino.x - origen.x;
+  const dy = destino.y - origen.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return { x: origen.x + Math.sign(dx || 1) * GEOMETRIA_ARBOL.anchoNodo / 2, y: origen.y };
+  }
+  return { x: origen.x, y: origen.y + Math.sign(dy || 1) * GEOMETRIA_ARBOL.altoNodo / 2 };
+}
+
+function trazoVinculo(origen: NodoPosicionado, destino: NodoPosicionado, tipo: VinculoVisualArbol["tipo"]) {
+  if (tipo === "filiacion") {
+    const inicio = { x: origen.x, y: origen.y + GEOMETRIA_ARBOL.altoNodo / 2 };
+    const fin = { x: destino.x, y: destino.y - GEOMETRIA_ARBOL.altoNodo / 2 };
+    const yMedio = (inicio.y + fin.y) / 2;
+    return `M${inicio.x},${inicio.y} C${inicio.x},${yMedio} ${fin.x},${yMedio} ${fin.x},${fin.y}`;
+  }
+
+  const inicio = puntoEnBorde(origen, destino);
+  const fin = puntoEnBorde(destino, origen);
+  if (Math.abs(inicio.x - fin.x) >= Math.abs(inicio.y - fin.y)) {
+    const xMedio = (inicio.x + fin.x) / 2;
+    return `M${inicio.x},${inicio.y} C${xMedio},${inicio.y} ${xMedio},${fin.y} ${fin.x},${fin.y}`;
+  }
+  const yMedio = (inicio.y + fin.y) / 2;
+  return `M${inicio.x},${inicio.y} C${inicio.x},${yMedio} ${fin.x},${yMedio} ${fin.x},${fin.y}`;
+}
+
+function dibujarVinculosNormalizados(
+  svg: SVGElement,
+  nodos: NodoPosicionado[],
+  vinculos: VinculoVisualArbol[],
+) {
+  const capa = svg.querySelector<SVGGElement>(".links_view");
+  if (!capa) return;
+  capa.querySelectorAll(".arbol-vinculo-normalizado").forEach((path) => path.remove());
+  capa.querySelectorAll<SVGPathElement>("path.link").forEach((path) => {
+    path.style.display = "none";
+  });
+  const nodosPorId = new Map(nodos.map((nodo) => [nodo.data.id, nodo]));
+  for (const vinculo of vinculos) {
+    const origen = nodosPorId.get(vinculo.origenId);
+    const destino = nodosPorId.get(vinculo.destinoId);
+    if (!origen || !destino) continue;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("class", `arbol-vinculo-normalizado arbol-vinculo-${vinculo.tipo}`);
+    path.setAttribute("d", trazoVinculo(origen, destino, vinculo.tipo));
+    path.setAttribute("data-vinculo-id", vinculo.id);
+    path.setAttribute("data-vinculo-tipo", vinculo.tipo);
+    path.setAttribute("fill", "none");
+    capa.appendChild(path);
+  }
 }
 
 export function ArbolClient({ personas }: Props) {
@@ -45,16 +98,19 @@ export function ArbolClient({ personas }: Props) {
   const libreriaRef = useRef<FamilyChartModule | null>(null);
   const [personaSeleccionadaId, setPersonaSeleccionadaId] = useState<string | null>(null);
   const [detalleZoom, setDetalleZoom] = useState<"lejos" | "medio" | "cerca">("medio");
+  const modeloArbol = useMemo(() => crearModeloArbol(personas), [personas]);
   const datosChart = useMemo(() => crearDatosFamilyChart(personas), [personas]);
+  const vinculosVisuales = useMemo(() => crearVinculosVisualesArbol(modeloArbol), [modeloArbol]);
   const personaPorId = useMemo(() => new Map(personas.map((persona) => [persona.id, persona])), [personas]);
   const personaSeleccionada = personaSeleccionadaId ? personaPorId.get(personaSeleccionadaId) ?? null : null;
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
-    const diagnostico = diagnosticarDatosFamilyChart(datosChart);
-    const nivel = diagnostico.errores.length || diagnostico.faltantes.length ? console.error : console.info;
-    nivel("[Árbol Biani] Auditoría completa de cobertura y familias", diagnostico);
-  }, [datosChart]);
+    const diagnosticoModelo = diagnosticarModeloArbol(personas);
+    const diagnosticoLayout = diagnosticarDatosFamilyChart(datosChart);
+    const nivel = diagnosticoModelo.errores.length || diagnosticoLayout.errores.length ? console.error : console.info;
+    nivel("[Árbol Biani] Auditoría del grafo normalizado y su bosque de layout", { diagnosticoModelo, diagnosticoLayout });
+  }, [datosChart, personas]);
 
   const ajustarVistaCompleta = useCallback(() => {
     const chart = chartRef.current;
@@ -110,31 +166,24 @@ export function ArbolClient({ personas }: Props) {
         const claseGenero = datosPersona.sinGeneroDefinido ? " arbol-nodo-sin-genero" : "";
         return `<div class="arbol-nodo${claseLineaSangre}${claseGenero}" data-persona-id="${escaparHtml(datum.data.id)}" role="button" tabindex="0" aria-label="Abrir ficha de ${escaparHtml(nombrePersona)}" title="${escaparHtml(nombrePersona)}"><span class="arbol-nodo-nombre">${escaparHtml(nombrePersona)}</span>${datosPersona.anios ? `<span class="arbol-nodo-anios">${escaparHtml(datosPersona.anios)}</span>` : ""}</div>`;
       }).setOnCardClick((_event: MouseEvent, datum: { data: { id: string } }) => { if (datum.data.id !== RAIZ_MAPA_ID) setPersonaSeleccionadaId(datum.data.id); });
-      chart.setAfterUpdate(() => actual.querySelectorAll<SVGPathElement>("path.link").forEach((path) => {
-        // Sólo se ocultan los enlaces creados por la raíz de layout. El
-        // criterio anterior inspeccionaba objetos internos de d3 y podía
-        // confundir endpoints de relaciones reales con la raíz virtual.
-        const link = (path as SVGPathElement & { __data__?: { id?: string } }).__data__;
-        const esRaizTecnica = link?.id?.includes(RAIZ_MAPA_ID);
-        path.style.display = esRaizTecnica ? "none" : "";
-        // Estético: convierte el trazo recto en una curva suave. No se
-        // aplica a los enlaces técnicos ocultos.
-        if (!esRaizTecnica) suavizarTrazoVinculo(path);
-      }));
+      chart.setAfterUpdate(() => {
+        const nodos = (chart.store.getTree()?.data ?? []) as NodoPosicionado[];
+        dibujarVinculosNormalizados(chart.svg, nodos, vinculosVisuales);
+      });
       chart.updateTree({ initial: true, tree_position: "fit", transition_time: 0 });
       if (process.env.NODE_ENV !== "production") {
         const raizTecnica = datosChart.find((dato) => dato.id === RAIZ_MAPA_ID);
-        const anclasEnviadas = (raizTecnica?.rels.children ?? []).map((id) => ({
+        const raicesEnviadas = (raizTecnica?.rels.children ?? []).map((id) => ({
           id,
           nombre: `${datosChart.find((dato) => dato.id === id)?.data.nombre ?? ""} ${datosChart.find((dato) => dato.id === id)?.data.apellido ?? ""}`.trim(),
         }));
-        const diagnostico = diagnosticarDatosFamilyChart(datosChart);
-        console.info("[Árbol Biani] main_id/root y anclas entregadas a family-chart", {
+        const diagnosticoLayout = diagnosticarDatosFamilyChart(datosChart);
+        console.info("[Árbol Biani] main_id/root y raíces entregadas a family-chart", {
           mainIdFamilyChart: chart.store.getMainId(),
           raizTecnicaId: RAIZ_MAPA_ID,
-          anclasEnviadas,
-          anclasAuditadas: diagnostico.anclas,
-          coincideConAuditoria: anclasEnviadas.map(({ id }) => id).join("|") === diagnostico.anclas.join("|"),
+          raicesEnviadas,
+          raicesAuditadas: diagnosticoLayout.raicesLayout,
+          coincideConAuditoria: raicesEnviadas.map(({ id }) => id).join("|") === diagnosticoLayout.raicesLayout.join("|"),
         });
         const esperados = datosChart.filter((dato) => dato.id !== RAIZ_MAPA_ID).map((dato) => dato.id);
         const idsRenderizados = (chart.store.getTree()?.data.map((dato) => dato.data.id) ?? []).filter((id) => id !== RAIZ_MAPA_ID);
@@ -151,6 +200,8 @@ export function ArbolClient({ personas }: Props) {
           esperadas: esperados.length,
           renderizadasEnLayout: esperados.length - faltantesEnLayout.length,
           nodosVisibles: visibles.size,
+          vinculosEsperados: vinculosVisuales.length,
+          vinculosDibujados: actual.querySelectorAll(".arbol-vinculo-normalizado").length,
           faltantesEnLayout: faltantesEnLayout.map((id) => ({ id, motivo: "family-chart no generó un nodo renderizable desde el componente" })),
           duplicadosEnLayout: duplicadosEnLayout.map((id) => ({ id, motivo: "family-chart recorrió la persona por más de una rama" })),
           faltantesVisibles: faltantesVisibles.map((id) => ({ id, motivo: "family-chart no creó una tarjeta visible en el DOM" })),
@@ -173,7 +224,7 @@ export function ArbolClient({ personas }: Props) {
     }
     iniciarMapa();
     return () => { activo = false; if (intervaloZoom) window.clearInterval(intervaloZoom); resizeObserver?.disconnect(); contenedor.removeEventListener("pointerdown", deseleccionarFondo); chartRef.current = null; libreriaRef.current = null; contenedor.innerHTML = ""; };
-  }, [ajustarVistaCompleta, datosChart, personas.length]);
+  }, [ajustarVistaCompleta, datosChart, personas.length, vinculosVisuales]);
 
   useEffect(() => {
     const contenedor = contenedorRef.current;

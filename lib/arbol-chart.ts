@@ -2,9 +2,8 @@ import type { PersonaArbol } from "@/lib/supabase/types";
 
 export const RAIZ_MAPA_ID = "__arbol_mapa_raiz__";
 
-// Única fuente de dimensiones para el DOM de las fichas y el cálculo de
-// posiciones de family-chart. Las separaciones conservan aire suficiente
-// alrededor de tarjetas con nombres de hasta dos líneas.
+// Unica fuente de dimensiones para el DOM de las fichas, el calculo de
+// posiciones de family-chart y los vinculos normalizados superpuestos.
 export const GEOMETRIA_ARBOL = {
   anchoNodo: 176,
   altoNodo: 92,
@@ -14,7 +13,18 @@ export const GEOMETRIA_ARBOL = {
 
 export interface DatoFamilyChart {
   id: string;
-  data: { gender: "M" | "F"; nombre?: string; apellido?: string; anios?: string; iniciales?: string; orden: string; virtual?: boolean; sinLineaSangre?: boolean; sinGeneroDefinido?: boolean };
+  data: {
+    gender: "M" | "F";
+    nombre?: string;
+    apellido?: string;
+    anios?: string;
+    iniciales?: string;
+    orden: string;
+    virtual?: boolean;
+    sinLineaSangre?: boolean;
+    sinGeneroDefinido?: boolean;
+    tieneConyuge?: boolean;
+  };
   rels: { parents: string[]; children: string[]; spouses: string[] };
 }
 
@@ -24,12 +34,22 @@ export interface FamiliaArbol {
   hijos: string[];
 }
 
-export type CriterioAnclaArbol = "raiz-con-descendencia" | "relacion-de-sangre" | "solo-conyugal";
-
 export interface ComponenteArbol {
   ids: string[];
-  ancla: string;
-  criterioAncla: CriterioAnclaArbol;
+  raicesAncestrales: string[];
+}
+
+export type CodigoProblemaArbol =
+  | "referencia-ausente"
+  | "auto-referencia-filiacion"
+  | "auto-referencia-conyugal"
+  | "mas-de-dos-progenitores"
+  | "ciclo-filiacion";
+
+export interface ProblemaArbol {
+  codigo: CodigoProblemaArbol;
+  ids: string[];
+  detalle: string;
 }
 
 export interface ModeloArbol {
@@ -39,70 +59,102 @@ export interface ModeloArbol {
   conyugesPorPersona: Map<string, Set<string>>;
   familias: FamiliaArbol[];
   componentes: ComponenteArbol[];
+  problemas: ProblemaArbol[];
 }
 
-// Superconjunto mínimo compatible tanto con DatoFamilyChart como con Datum
+export interface BosqueLayoutArbol {
+  padrePrincipalPorHijo: Map<string, string>;
+  hijosPorPadrePrincipal: Map<string, Set<string>>;
+  personaAdjuntaAConyuge: Map<string, string>;
+  conyugesAdjuntosPorPersona: Map<string, Set<string>>;
+  raices: string[];
+}
+
+export interface VinculoVisualArbol {
+  id: string;
+  tipo: "filiacion" | "conyugal";
+  origenId: string;
+  destinoId: string;
+}
+
+// Superconjunto minimo compatible tanto con DatoFamilyChart como con Datum
 // de family-chart, que permite pasar estas funciones directo a su API.
 interface DatoOrdenableParaLayout {
   id: string;
-  data: { gender: "M" | "F"; orden?: string };
+  data: { gender: "M" | "F"; orden?: string; tieneConyuge?: boolean };
   rels: { spouses: string[] };
 }
 
-function claveOrden(persona: PersonaArbol) { return `${persona.fecha_nacimiento ?? "9999-99-99"}|${persona.apellido}|${persona.nombre}|${persona.id}`.toLocaleLowerCase("es"); }
-function anios(persona: PersonaArbol) { return [persona.fecha_nacimiento?.slice(0, 4), persona.fecha_fallecimiento?.slice(0, 4)].filter(Boolean).join(" — "); }
-function iniciales(persona: PersonaArbol) { return `${persona.nombre.charAt(0)}${persona.apellido.charAt(0)}`.toLocaleUpperCase("es"); }
-function asegurar(mapa: Map<string, Set<string>>, id: string) { if (!mapa.has(id)) mapa.set(id, new Set()); return mapa.get(id)!; }
+function claveOrden(persona: PersonaArbol) {
+  return `${persona.fecha_nacimiento ?? "9999-99-99"}|${persona.apellido}|${persona.nombre}|${persona.id}`.toLocaleLowerCase("es");
+}
+
+function anios(persona: PersonaArbol) {
+  return [persona.fecha_nacimiento?.slice(0, 4), persona.fecha_fallecimiento?.slice(0, 4)].filter(Boolean).join(" — ");
+}
+
+function iniciales(persona: PersonaArbol) {
+  return `${persona.nombre.charAt(0)}${persona.apellido.charAt(0)}`.toLocaleUpperCase("es");
+}
+
+function asegurar(mapa: Map<string, Set<string>>, id: string) {
+  if (!mapa.has(id)) mapa.set(id, new Set());
+  return mapa.get(id)!;
+}
+
 function ordenarIds(ids: Iterable<string>, personas: Map<string, PersonaArbol>) {
   const prioridadGenero = (id: string) => personas.get(id)?.genero === "masculino" ? 0 : personas.get(id)?.genero === "femenino" ? 1 : 2;
-  return [...new Set(ids)].filter((id) => personas.has(id)).sort((a, b) => prioridadGenero(a) - prioridadGenero(b) || claveOrden(personas.get(a)!).localeCompare(claveOrden(personas.get(b)!), "es"));
+  return [...new Set(ids)]
+    .filter((id) => personas.has(id))
+    .sort((a, b) => prioridadGenero(a) - prioridadGenero(b) || claveOrden(personas.get(a)!).localeCompare(claveOrden(personas.get(b)!), "es"));
 }
 
-function descendenciaAlcanzable(id: string, hijosPorPadre: Map<string, Set<string>>) {
-  const alcanzados = new Set<string>();
-  const cola = [id];
-  while (cola.length) {
-    const actual = cola.shift()!;
-    if (alcanzados.has(actual)) continue;
-    alcanzados.add(actual);
-    (hijosPorPadre.get(actual) ?? []).forEach((hijo) => { if (!alcanzados.has(hijo)) cola.push(hijo); });
-  }
-  return alcanzados.size;
+function claveProblema(codigo: CodigoProblemaArbol, ids: string[]) {
+  return `${codigo}:${ids.join(":")}`;
 }
 
-function seleccionarAnclaComponente(
-  ids: string[],
+function detectarCiclosFiliacion(
   personas: Map<string, PersonaArbol>,
-  padresPorHijo: Map<string, Set<string>>,
   hijosPorPadre: Map<string, Set<string>>,
-): Pick<ComponenteArbol, "ancla" | "criterioAncla"> {
-  const tienePadres = (id: string) => (padresPorHijo.get(id)?.size ?? 0) > 0;
-  const tieneHijos = (id: string) => (hijosPorPadre.get(id)?.size ?? 0) > 0;
-  const ordenarCandidatas = (candidatas: string[]) => [...candidatas].sort((a, b) => {
-    // Dentro de la misma preferencia se usa la rama de descendencia más
-    // extensa. family-chart sólo recorre children desde el ancla, por lo que
-    // esto evita que una raíz lateral deje fuera a ancestros de su cónyuge.
-    const diferenciaCobertura = descendenciaAlcanzable(b, hijosPorPadre) - descendenciaAlcanzable(a, hijosPorPadre);
-    return diferenciaCobertura || ordenarIds([a, b], personas).indexOf(a) - ordenarIds([a, b], personas).indexOf(b);
+): ProblemaArbol[] {
+  const estado = new Map<string, "visitando" | "visitado">();
+  const camino: string[] = [];
+  const ciclos = new Map<string, ProblemaArbol>();
+
+  const visitar = (id: string) => {
+    estado.set(id, "visitando");
+    camino.push(id);
+    for (const hijo of ordenarIds(hijosPorPadre.get(id) ?? [], personas)) {
+      if (estado.get(hijo) === "visitando") {
+        const inicio = camino.indexOf(hijo);
+        const ciclo = [...camino.slice(inicio), hijo];
+        const miembros = [...new Set(ciclo.slice(0, -1))].sort();
+        ciclos.set(claveProblema("ciclo-filiacion", miembros), {
+          codigo: "ciclo-filiacion",
+          ids: ciclo,
+          detalle: `Ciclo de filiacion detectado: ${ciclo.join(" -> ")}.`,
+        });
+      } else if (!estado.has(hijo)) {
+        visitar(hijo);
+      }
+    }
+    camino.pop();
+    estado.set(id, "visitado");
+  };
+
+  ordenarIds(personas.keys(), personas).forEach((id) => {
+    if (!estado.has(id)) visitar(id);
   });
-
-  const raicesConDescendencia = ids.filter((id) => !tienePadres(id) && tieneHijos(id));
-  if (raicesConDescendencia.length) return { ancla: ordenarCandidatas(raicesConDescendencia)[0], criterioAncla: "raiz-con-descendencia" };
-
-  const conRelacionDeSangre = ids.filter((id) => tienePadres(id) || tieneHijos(id));
-  if (conRelacionDeSangre.length) return { ancla: ordenarCandidatas(conRelacionDeSangre)[0], criterioAncla: "relacion-de-sangre" };
-
-  // Si no hay filiaciones en absoluto, una pareja o una persona aislada es
-  // el único punto de entrada posible. Se mantiene el orden estable.
-  return { ancla: ordenarIds(ids, personas)[0], criterioAncla: "solo-conyugal" };
+  return [...ciclos.values()];
 }
 
 // family-chart inserta la pareja a la izquierda de una mujer y a la derecha
-// de un varón. Llevar esos hermanos a los extremos mantiene consecutivo el
-// bloque de hermanos y deja la pareja junto a la persona correspondiente.
+// de un varon. El bosque entrega una sola orientacion tecnica por pareja y
+// conserva la prioridad visual completa mediante tieneConyuge.
 export function compararHijosParaLayout(a: DatoOrdenableParaLayout, b: DatoOrdenableParaLayout) {
   const prioridad = (dato: DatoOrdenableParaLayout) => {
-    if (dato.rels.spouses.length === 0) return 1;
+    const tieneConyuge = dato.data.tieneConyuge || dato.rels.spouses.length > 0;
+    if (!tieneConyuge) return 1;
     return dato.data.gender === "F" ? 0 : 2;
   };
   const orden = (dato: DatoOrdenableParaLayout) => typeof dato.data.orden === "string" ? dato.data.orden : "";
@@ -118,32 +170,65 @@ export function ordenarConyugesParaLayout(persona: DatoOrdenableParaLayout, dato
 }
 
 /*
- * Modelo canónico: una familia no se infiere desde el primer cónyuge de
- * alguien. Es una unidad formada por la combinación concreta de progenitores
- * declarados por cada hijo (también admite un único progenitor). De él se
- * derivan, una sola vez, los rels que consume family-chart.
+ * Modelo genealogico canonico. La filiacion siempre queda dirigida de
+ * progenitor a hijo y el vinculo conyugal siempre queda disponible en ambos
+ * sentidos, sin importar desde que ficha se creo la unica fila persistida.
  */
 export function crearModeloArbol(entrada: PersonaArbol[]): ModeloArbol {
   const personas = new Map<string, PersonaArbol>();
-  entrada.forEach((persona) => { if (!personas.has(persona.id)) personas.set(persona.id, persona); });
+  entrada.forEach((persona) => {
+    if (!personas.has(persona.id)) personas.set(persona.id, persona);
+  });
   const padresPorHijo = new Map<string, Set<string>>();
   const hijosPorPadre = new Map<string, Set<string>>();
   const conyugesPorPersona = new Map<string, Set<string>>();
+  const problemasPorClave = new Map<string, ProblemaArbol>();
+
+  const registrarProblema = (problema: ProblemaArbol) => {
+    const idsClave = problema.codigo.includes("conyugal") ? [...problema.ids].sort() : problema.ids;
+    problemasPorClave.set(claveProblema(problema.codigo, idsClave), problema);
+  };
   const filiacion = (padre: string, hijo: string) => {
-    if (padre === hijo || !personas.has(padre) || !personas.has(hijo)) return;
+    if (padre === hijo) {
+      registrarProblema({ codigo: "auto-referencia-filiacion", ids: [padre], detalle: `${padre} figura como su propio progenitor.` });
+      return;
+    }
+    if (!personas.has(padre) || !personas.has(hijo)) {
+      registrarProblema({ codigo: "referencia-ausente", ids: [padre, hijo], detalle: `La filiacion ${padre} -> ${hijo} referencia una persona ausente.` });
+      return;
+    }
     asegurar(padresPorHijo, hijo).add(padre);
     asegurar(hijosPorPadre, padre).add(hijo);
   };
   const conyuge = (a: string, b: string) => {
-    if (a === b || !personas.has(a) || !personas.has(b)) return;
+    if (a === b) {
+      registrarProblema({ codigo: "auto-referencia-conyugal", ids: [a], detalle: `${a} figura como su propio conyuge.` });
+      return;
+    }
+    if (!personas.has(a) || !personas.has(b)) {
+      registrarProblema({ codigo: "referencia-ausente", ids: [a, b], detalle: `El vinculo conyugal ${a} <-> ${b} referencia una persona ausente.` });
+      return;
+    }
     asegurar(conyugesPorPersona, a).add(b);
     asegurar(conyugesPorPersona, b).add(a);
   };
+
   for (const persona of personas.values()) {
     persona.padres_ids.forEach((padre) => filiacion(padre, persona.id));
     persona.hijos_ids.forEach((hijo) => filiacion(persona.id, hijo));
     persona.conyuges_ids.forEach((pareja) => conyuge(persona.id, pareja));
   }
+
+  for (const [hijo, padres] of padresPorHijo) {
+    if (padres.size > 2) {
+      registrarProblema({
+        codigo: "mas-de-dos-progenitores",
+        ids: [hijo, ...ordenarIds(padres, personas)],
+        detalle: `${hijo} tiene ${padres.size} progenitores registrados.`,
+      });
+    }
+  }
+  detectarCiclosFiliacion(personas, hijosPorPadre).forEach(registrarProblema);
 
   const familiasPorId = new Map<string, FamiliaArbol>();
   for (const persona of personas.values()) {
@@ -154,7 +239,10 @@ export function crearModeloArbol(entrada: PersonaArbol[]): ModeloArbol {
     familia.hijos.push(persona.id);
     familiasPorId.set(id, familia);
   }
-  const familias = [...familiasPorId.values()].map((familia) => ({ ...familia, hijos: ordenarIds(familia.hijos, personas) }));
+  const familias = [...familiasPorId.values()].map((familia) => ({
+    ...familia,
+    hijos: ordenarIds(familia.hijos, personas),
+  }));
 
   const visitados = new Set<string>();
   const componentes: ComponenteArbol[] = [];
@@ -166,45 +254,213 @@ export function crearModeloArbol(entrada: PersonaArbol[]): ModeloArbol {
     for (let indice = 0; indice < cola.length; indice += 1) {
       const id = cola[indice];
       ids.push(id);
-      const vecinos = [...(padresPorHijo.get(id) ?? []), ...(hijosPorPadre.get(id) ?? []), ...(conyugesPorPersona.get(id) ?? [])];
-      vecinos.forEach((vecino) => { if (!visitados.has(vecino)) { visitados.add(vecino); cola.push(vecino); } });
+      const vecinos = [
+        ...(padresPorHijo.get(id) ?? []),
+        ...(hijosPorPadre.get(id) ?? []),
+        ...(conyugesPorPersona.get(id) ?? []),
+      ];
+      vecinos.forEach((vecino) => {
+        if (!visitados.has(vecino)) {
+          visitados.add(vecino);
+          cola.push(vecino);
+        }
+      });
     }
-    const ancla = seleccionarAnclaComponente(ids, personas, padresPorHijo, hijosPorPadre);
-    componentes.push({ ids, ...ancla });
+    const idsOrdenados = ordenarIds(ids, personas);
+    const sinProgenitores = idsOrdenados.filter((id) => (padresPorHijo.get(id)?.size ?? 0) === 0);
+    const conDescendencia = sinProgenitores.filter((id) => (hijosPorPadre.get(id)?.size ?? 0) > 0);
+    const raicesAncestrales = conDescendencia.length > 0 ? conDescendencia : sinProgenitores;
+    componentes.push({ ids: idsOrdenados, raicesAncestrales });
   }
-  return { personas, padresPorHijo, hijosPorPadre, conyugesPorPersona, familias, componentes };
+
+  return {
+    personas,
+    padresPorHijo,
+    hijosPorPadre,
+    conyugesPorPersona,
+    familias,
+    componentes,
+    problemas: [...problemasPorClave.values()],
+  };
+}
+
+function calcularProfundidades(modelo: ModeloArbol) {
+  const pendientes = new Map<string, number>();
+  const profundidades = new Map<string, number>();
+  const cola: string[] = [];
+  for (const id of modelo.personas.keys()) {
+    const cantidadPadres = modelo.padresPorHijo.get(id)?.size ?? 0;
+    pendientes.set(id, cantidadPadres);
+    profundidades.set(id, 0);
+    if (cantidadPadres === 0) cola.push(id);
+  }
+  cola.sort((a, b) => ordenarIds([a, b], modelo.personas).indexOf(a) - ordenarIds([a, b], modelo.personas).indexOf(b));
+  for (let indice = 0; indice < cola.length; indice += 1) {
+    const padre = cola[indice];
+    for (const hijo of modelo.hijosPorPadre.get(padre) ?? []) {
+      profundidades.set(hijo, Math.max(profundidades.get(hijo) ?? 0, (profundidades.get(padre) ?? 0) + 1));
+      const restantes = (pendientes.get(hijo) ?? 1) - 1;
+      pendientes.set(hijo, restantes);
+      if (restantes === 0) cola.push(hijo);
+    }
+  }
+  return profundidades;
+}
+
+function creariaCicloEnBosque(padre: string, hijo: string, padrePrincipalPorHijo: Map<string, string>) {
+  let actual: string | undefined = padre;
+  const visitados = new Set<string>();
+  while (actual && !visitados.has(actual)) {
+    if (actual === hijo) return true;
+    visitados.add(actual);
+    actual = padrePrincipalPorHijo.get(actual);
+  }
+  return false;
+}
+
+function seleccionarConyugesAdjuntos(modelo: ModeloArbol) {
+  const personaAdjuntaAConyuge = new Map<string, string>();
+  const conyugesAdjuntosPorPersona = new Map<string, Set<string>>();
+  const tieneFiliacion = (id: string) =>
+    (modelo.padresPorHijo.get(id)?.size ?? 0) > 0 || (modelo.hijosPorPadre.get(id)?.size ?? 0) > 0;
+  const posiblesPropietarios = ordenarIds(modelo.personas.keys(), modelo.personas).sort((a, b) =>
+    Number(tieneFiliacion(b)) - Number(tieneFiliacion(a))
+    || (modelo.conyugesPorPersona.get(b)?.size ?? 0) - (modelo.conyugesPorPersona.get(a)?.size ?? 0)
+    || claveOrden(modelo.personas.get(a)!).localeCompare(claveOrden(modelo.personas.get(b)!), "es"));
+
+  // family-chart mantiene contiguos los conyuges agregados por una persona.
+  // Un conyuge adjunto no puede a su vez ser propietario de otro: asi cada
+  // tarjeta tiene un unico punto de entrada al layout, incluso con parejas
+  // multiples o cadenas de matrimonios.
+  for (const propietario of posiblesPropietarios) {
+    if (personaAdjuntaAConyuge.has(propietario)) continue;
+    for (const pareja of ordenarIds(modelo.conyugesPorPersona.get(propietario) ?? [], modelo.personas)) {
+      if (personaAdjuntaAConyuge.has(pareja) || conyugesAdjuntosPorPersona.has(pareja)) continue;
+      personaAdjuntaAConyuge.set(pareja, propietario);
+      asegurar(conyugesAdjuntosPorPersona, propietario).add(pareja);
+    }
+  }
+  return { personaAdjuntaAConyuge, conyugesAdjuntosPorPersona };
+}
+
+/*
+ * family-chart calcula una jerarquia, no un grafo genealogico con uniones de
+ * ramas. Para posicionar cada tarjeta exactamente una vez se elige un solo
+ * progenitor tecnico por hijo. Los demas vinculos no se pierden: se dibujan
+ * luego desde el modelo canonico mediante crearVinculosVisualesArbol().
+ */
+export function crearBosqueLayoutArbol(modelo: ModeloArbol): BosqueLayoutArbol {
+  const profundidades = calcularProfundidades(modelo);
+  const { personaAdjuntaAConyuge, conyugesAdjuntosPorPersona } = seleccionarConyugesAdjuntos(modelo);
+  const padrePrincipalPorHijo = new Map<string, string>();
+  const hijosPorPadrePrincipal = new Map<string, Set<string>>();
+  const idsPorProfundidad = ordenarIds(modelo.personas.keys(), modelo.personas).sort((a, b) =>
+    (profundidades.get(a) ?? 0) - (profundidades.get(b) ?? 0)
+    || claveOrden(modelo.personas.get(a)!).localeCompare(claveOrden(modelo.personas.get(b)!), "es"));
+
+  for (const hijo of idsPorProfundidad) {
+    if (personaAdjuntaAConyuge.has(hijo)) continue;
+    const candidatos = ordenarIds(modelo.padresPorHijo.get(hijo) ?? [], modelo.personas)
+      .filter((padre) => !personaAdjuntaAConyuge.has(padre))
+      .sort((a, b) =>
+      (profundidades.get(b) ?? 0) - (profundidades.get(a) ?? 0)
+      || claveOrden(modelo.personas.get(a)!).localeCompare(claveOrden(modelo.personas.get(b)!), "es"));
+    const padre = candidatos.find((candidato) => !creariaCicloEnBosque(candidato, hijo, padrePrincipalPorHijo));
+    if (!padre) continue;
+    padrePrincipalPorHijo.set(hijo, padre);
+    asegurar(hijosPorPadrePrincipal, padre).add(hijo);
+  }
+
+  // Las raices de cada componente quedan consecutivas. Esto mantiene juntas
+  // las ramas que se conectan por matrimonio, aunque tengan ancestros propios.
+  const raices: string[] = [];
+  for (const componente of modelo.componentes) {
+    const raicesComponente = ordenarIds(
+      componente.ids.filter((id) => !padrePrincipalPorHijo.has(id) && !personaAdjuntaAConyuge.has(id)),
+      modelo.personas,
+    );
+    raices.push(...raicesComponente);
+  }
+  return {
+    padrePrincipalPorHijo,
+    hijosPorPadrePrincipal,
+    personaAdjuntaAConyuge,
+    conyugesAdjuntosPorPersona,
+    raices,
+  };
+}
+
+export function crearVinculosVisualesArbol(modelo: ModeloArbol): VinculoVisualArbol[] {
+  const vinculos: VinculoVisualArbol[] = [];
+  for (const padre of ordenarIds(modelo.personas.keys(), modelo.personas)) {
+    for (const hijo of ordenarIds(modelo.hijosPorPadre.get(padre) ?? [], modelo.personas)) {
+      vinculos.push({ id: `filiacion:${padre}:${hijo}`, tipo: "filiacion", origenId: padre, destinoId: hijo });
+    }
+  }
+  const parejasAgregadas = new Set<string>();
+  for (const persona of ordenarIds(modelo.personas.keys(), modelo.personas)) {
+    for (const pareja of ordenarIds(modelo.conyugesPorPersona.get(persona) ?? [], modelo.personas)) {
+      const [a, b] = [persona, pareja].sort();
+      const clave = `${a}:${b}`;
+      if (parejasAgregadas.has(clave)) continue;
+      parejasAgregadas.add(clave);
+      vinculos.push({ id: `conyugal:${clave}`, tipo: "conyugal", origenId: a, destinoId: b });
+    }
+  }
+  return vinculos;
 }
 
 export function crearDatosFamilyChart(entrada: PersonaArbol[]): DatoFamilyChart[] {
   const modelo = crearModeloArbol(entrada);
-  const datos = [...modelo.personas.values()].sort((a, b) => claveOrden(a).localeCompare(claveOrden(b), "es")).map<DatoFamilyChart>((persona) => ({
-    id: persona.id,
-    data: {
-      gender: persona.genero === "femenino" ? "F" : "M",
-      nombre: persona.nombre,
-      apellido: persona.apellido,
-      anios: anios(persona),
-      iniciales: iniciales(persona),
-      orden: claveOrden(persona),
-      // No es una etiqueta de sangre ni se persiste: sólo distingue a quien
-      // aparece en este componente exclusivamente por ser pareja de alguien.
-      sinLineaSangre: (modelo.padresPorHijo.get(persona.id)?.size ?? 0) === 0
-        && (modelo.hijosPorPadre.get(persona.id)?.size ?? 0) === 0
-        && (modelo.conyugesPorPersona.get(persona.id)?.size ?? 0) > 0,
-      // Puramente visual: pinta la ficha en tono neutro cuando no hay género
-      // cargado, sin tocar `gender` (M/F), que sigue usando family-chart para
-      // el layout y el orden de cónyuges dentro de cada generación.
-      sinGeneroDefinido: persona.genero === "no_definido",
-    },
-    rels: {
-      parents: ordenarIds(modelo.padresPorHijo.get(persona.id) ?? [], modelo.personas),
-      children: ordenarIds(modelo.hijosPorPadre.get(persona.id) ?? [], modelo.personas),
-      spouses: ordenarIds(modelo.conyugesPorPersona.get(persona.id) ?? [], modelo.personas),
-    },
-  }));
-  // Root es una ancla de layout, no un padre técnico: sólo sale hacia una
-  // persona por componente. Así no altera la familia real de esa persona.
-  return [{ id: RAIZ_MAPA_ID, data: { gender: "M", virtual: true, orden: "" }, rels: { parents: [], children: modelo.componentes.map((componente) => componente.ancla), spouses: [] } }, ...datos];
+  const bosque = crearBosqueLayoutArbol(modelo);
+  const datos = [...modelo.personas.values()]
+    .sort((a, b) => claveOrden(a).localeCompare(claveOrden(b), "es"))
+    .map<DatoFamilyChart>((persona) => ({
+      id: persona.id,
+      data: {
+        gender: persona.genero === "femenino" ? "F" : "M",
+        nombre: persona.nombre,
+        apellido: persona.apellido,
+        anios: anios(persona),
+        iniciales: iniciales(persona),
+        orden: claveOrden(persona),
+        sinLineaSangre: (modelo.padresPorHijo.get(persona.id)?.size ?? 0) === 0
+          && (modelo.hijosPorPadre.get(persona.id)?.size ?? 0) === 0
+          && (modelo.conyugesPorPersona.get(persona.id)?.size ?? 0) > 0,
+        sinGeneroDefinido: persona.genero === "no_definido",
+        tieneConyuge: (modelo.conyugesPorPersona.get(persona.id)?.size ?? 0) > 0,
+      },
+      rels: {
+        parents: bosque.padrePrincipalPorHijo.has(persona.id) ? [bosque.padrePrincipalPorHijo.get(persona.id)!] : [],
+        children: ordenarIds(bosque.hijosPorPadrePrincipal.get(persona.id) ?? [], modelo.personas),
+        // Solo se entrega la orientacion tecnica que mantiene juntas las
+        // tarjetas sin duplicarlas. La reciprocidad y todas las lineas reales
+        // siguen saliendo del modelo canonico.
+        spouses: ordenarIds(bosque.conyugesAdjuntosPorPersona.get(persona.id) ?? [], modelo.personas),
+      },
+    }));
+
+  return [{
+    id: RAIZ_MAPA_ID,
+    data: { gender: "M", virtual: true, orden: "" },
+    rels: { parents: [], children: bosque.raices, spouses: [] },
+  }, ...datos];
+}
+
+export function diagnosticarModeloArbol(entrada: PersonaArbol[]) {
+  const modelo = crearModeloArbol(entrada);
+  const bosque = crearBosqueLayoutArbol(modelo);
+  const vinculos = crearVinculosVisualesArbol(modelo);
+  return {
+    errores: modelo.problemas,
+    cantidadPersonas: modelo.personas.size,
+    cantidadComponentes: modelo.componentes.length,
+    cantidadFiliaciones: vinculos.filter((vinculo) => vinculo.tipo === "filiacion").length,
+    cantidadVinculosConyugales: vinculos.filter((vinculo) => vinculo.tipo === "conyugal").length,
+    raicesLayout: bosque.raices,
+    componentes: modelo.componentes,
+    familias: modelo.familias,
+  };
 }
 
 export function diagnosticarDatosFamilyChart(datos: DatoFamilyChart[]) {
@@ -218,23 +474,27 @@ export function diagnosticarDatosFamilyChart(datos: DatoFamilyChart[]) {
     if (alcanzables.has(id)) continue;
     alcanzables.add(id);
     const dato = porId.get(id);
-    if (dato) [...dato.rels.parents, ...dato.rels.children, ...dato.rels.spouses].forEach((relacionado) => { if (!alcanzables.has(relacionado)) cola.push(relacionado); });
+    if (dato) [...dato.rels.children, ...dato.rels.spouses].forEach((relacionado) => {
+      if (!alcanzables.has(relacionado)) cola.push(relacionado);
+    });
   }
   for (const dato of reales) {
-    for (const padre of dato.rels.parents) if (!porId.get(padre)?.rels.children.includes(dato.id)) errores.push(`${dato.id}: filiación sin reciprocidad con ${padre}`);
-    for (const hijo of dato.rels.children) if (!porId.get(hijo)?.rels.parents.includes(dato.id)) errores.push(`${dato.id}: hijo sin reciprocidad con ${hijo}`);
-    for (const pareja of dato.rels.spouses) if (!porId.get(pareja)?.rels.spouses.includes(dato.id)) errores.push(`${dato.id}: pareja sin reciprocidad con ${pareja}`);
+    for (const padre of dato.rels.parents) {
+      if (!porId.get(padre)?.rels.children.includes(dato.id)) errores.push(`${dato.id}: layout sin reciprocidad con ${padre}`);
+    }
+    for (const hijo of dato.rels.children) {
+      if (!porId.get(hijo)?.rels.parents.includes(dato.id)) errores.push(`${dato.id}: layout sin reciprocidad con ${hijo}`);
+    }
   }
-  const faltantes = reales.filter((dato) => !alcanzables.has(dato.id)).map((dato) => ({ id: dato.id, motivo: "componente sin ancla alcanzable" }));
+  const faltantes = reales
+    .filter((dato) => !alcanzables.has(dato.id))
+    .map((dato) => ({ id: dato.id, motivo: "persona sin camino unico desde la raiz tecnica" }));
   faltantes.forEach(({ id, motivo }) => errores.push(`${id}: ${motivo}`));
-  const modelo = crearModeloArbol(reales.map((dato) => ({ id: dato.id, nombre: dato.data.nombre ?? "", apellido: dato.data.apellido ?? "", genero: dato.data.gender === "F" ? "femenino" : "masculino", fecha_nacimiento: null, lugar_nacimiento: null, fecha_fallecimiento: null, lugar_fallecimiento: null, notas: null, created_at: "", updated_at: "", padres_ids: dato.rels.parents, hijos_ids: dato.rels.children, conyuges_ids: dato.rels.spouses, hermanos_ids: [] })));
   return {
     errores,
     cantidadPersonas: reales.length,
     cantidadAlcanzables: reales.length - faltantes.length,
     faltantes,
-    anclas: modelo.componentes.map((componente) => componente.ancla),
-    componentes: modelo.componentes.map((componente) => ({ ancla: componente.ancla, criterioAncla: componente.criterioAncla, personas: componente.ids })),
-    familias: modelo.familias,
+    raicesLayout: porId.get(RAIZ_MAPA_ID)?.rels.children ?? [],
   };
 }
