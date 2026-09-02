@@ -1,12 +1,29 @@
 "use client";
 
+import { useEffect } from "react";
 import { useFormState, useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import { iniciarSesion } from "@/app/login/actions";
+import type { EstadoLogin } from "@/app/login/actions";
 
-const estadoInicial = { error: null as string | null };
+const estadoInicial: EstadoLogin = {
+  error: null,
+  autenticado: false,
+};
 
 export function LoginForm() {
   const [estado, accion] = useFormState(iniciarSesion, estadoInicial);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!estado.autenticado) return;
+
+    // La respuesta de la Server Action ya fue recibida y sus Set-Cookie ya
+    // fueron aplicados. Reemplazamos /login y forzamos un árbol RSC nuevo para
+    // que layouts y Server Components lean la sesión recién creada.
+    router.replace("/arbol");
+    router.refresh();
+  }, [estado.autenticado, router]);
 
   return (
     <form

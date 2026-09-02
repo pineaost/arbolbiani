@@ -1,3 +1,4 @@
+import { requerirUsuarioAutenticado } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { adjuntarNivelInformacion } from "@/lib/personas";
 import type {
@@ -43,7 +44,9 @@ export async function obtenerTodasLasFilas<T>(
 }
 
 export async function getPersonasArbol(): Promise<PersonaArbol[]> {
-  const supabase = await createClient();
+  // La página y su layout se renderizan de forma concurrente. Esta validación
+  // evita iniciar consultas protegidas suponiendo que el layout terminó antes.
+  const { supabase } = await requerirUsuarioAutenticado();
   const [personasData, filiacionesData, conyugesData] = await Promise.all([
     obtenerTodasLasFilas<Persona>((desde, hasta) => supabase
       .from("personas")
@@ -146,9 +149,9 @@ export async function getPadres(personaId: string): Promise<Persona[]> {
     throw new Error("No se pudieron cargar los padres.");
   }
 
-  return ((data ?? []) as unknown as { padre: Persona }[]).map(
-    (fila) => fila.padre
-  );
+  return ((data ?? []) as unknown as { padre: Persona | null }[])
+    .map((fila) => fila.padre)
+    .filter((padre): padre is Persona => !!padre);
 }
 
 export async function getHijos(personaId: string): Promise<Persona[]> {
@@ -164,9 +167,9 @@ export async function getHijos(personaId: string): Promise<Persona[]> {
     throw new Error("No se pudieron cargar los hijos.");
   }
 
-  return ((data ?? []) as unknown as { hijo: Persona }[]).map(
-    (fila) => fila.hijo
-  );
+  return ((data ?? []) as unknown as { hijo: Persona | null }[])
+    .map((fila) => fila.hijo)
+    .filter((hijo): hijo is Persona => !!hijo);
 }
 
 export async function getConyuges(personaId: string): Promise<Persona[]> {
@@ -182,11 +185,16 @@ export async function getConyuges(personaId: string): Promise<Persona[]> {
     throw new Error("No se pudieron cargar los cónyuges.");
   }
 
-  return (
-    (data ?? []) as unknown as { persona1: Persona; persona2: Persona }[]
-  ).map((fila) =>
-    fila.persona1.id === personaId ? fila.persona2 : fila.persona1
-  );
+  return ((data ?? []) as unknown as {
+    persona1: Persona | null;
+    persona2: Persona | null;
+  }[])
+    .map((fila) => {
+      if (fila.persona1?.id === personaId) return fila.persona2;
+      if (fila.persona2?.id === personaId) return fila.persona1;
+      return null;
+    })
+    .filter((conyuge): conyuge is Persona => !!conyuge);
 }
 
 export async function getPersonaConVinculos(
@@ -212,7 +220,10 @@ export async function getPersonaConVinculos(
     adjuntarNivelInformacion(supabase, [persona as Persona]),
   ]);
 
-  return { ...personasConNivel[0], padres, hijos, conyuges };
+  const personaConNivel = personasConNivel[0];
+  if (!personaConNivel) return null;
+
+  return { ...personaConNivel, padres, hijos, conyuges };
 }
 
 export async function getPersonaFicha(
@@ -268,13 +279,21 @@ export async function getPersonaFicha(
   const hijos = ((hijosData.data ?? []) as unknown as VinculoFiliacionFicha[])
     .filter((vinculo) => vinculo.persona);
   const conyuges = ((conyugesData.data ?? []) as unknown as Array<
-    Omit<VinculoConyugeFicha, "conyuge"> & { persona1: Persona; persona2: Persona }
+    Omit<VinculoConyugeFicha, "conyuge"> & {
+      persona1: Persona | null;
+      persona2: Persona | null;
+    }
   >)
-    .map(({ persona1, persona2, ...vinculo }) => ({
-      ...vinculo,
-      conyuge: persona1.id === personaId ? persona2 : persona1,
-    }))
-    .filter((vinculo) => vinculo.conyuge);
+    .map(({ persona1, persona2, ...vinculo }) => {
+      const conyuge = persona1?.id === personaId
+        ? persona2
+        : persona2?.id === personaId
+          ? persona1
+          : null;
+
+      return conyuge ? { ...vinculo, conyuge } : null;
+    })
+    .filter((vinculo): vinculo is VinculoConyugeFicha => !!vinculo);
 
   const documentos = ((documentosData.data ?? []) as unknown as {
     documento: Documento | null;
@@ -282,5 +301,8 @@ export async function getPersonaFicha(
     .map((vinculo) => vinculo.documento)
     .filter((documento): documento is Documento => !!documento);
 
-  return { ...personasConNivel[0], padres, hijos, conyuges, documentos, entradas_bitacora: (bitacoraData.data ?? []) as unknown as import("@/lib/supabase/types").EntradaBitacora[] };
+  const personaConNivel = personasConNivel[0];
+  if (!personaConNivel) return null;
+
+  return { ...personaConNivel, padres, hijos, conyuges, documentos, entradas_bitacora: (bitacoraData.data ?? []) as unknown as import("@/lib/supabase/types").EntradaBitacora[] };
 }

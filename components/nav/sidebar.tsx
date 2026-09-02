@@ -74,6 +74,7 @@ export function Sidebar() {
     }
 
     router.replace("/login");
+    router.refresh();
   }
 
   return (

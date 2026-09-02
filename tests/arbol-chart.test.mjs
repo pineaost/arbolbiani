@@ -46,6 +46,7 @@ const {
   RAIZ_MAPA_ID,
 } = cargarTransformador();
 const { normalizarPersonasArbol, obtenerTodasLasFilas } = cargarModulo("lib/relaciones.ts", {
+  "@/lib/supabase/auth": {},
   "@/lib/supabase/server": {},
   "@/lib/personas": {},
 });
