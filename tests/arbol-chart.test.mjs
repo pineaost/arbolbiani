@@ -34,12 +34,14 @@ function cargarModulo(archivoRelativo, dependencias = {}) {
 }
 
 const {
+  calcularLayoutArbol,
   compararHijosParaLayout,
   crearDatosFamilyChart,
   crearModeloArbol,
   crearTrazoVinculoArbol,
   crearVinculosVisualesArbol,
   diagnosticarDatosFamilyChart,
+  diagnosticarLayoutArbol,
   diagnosticarModeloArbol,
   GEOMETRIA_ARBOL,
   ordenarConyugesParaLayout,
@@ -739,4 +741,117 @@ test("la geometría ampliada evita solapamientos entre padres, hijos, hermanos y
       );
     }
   }
+});
+
+test("el layout propio centra la pareja sobre sus hijos y reserva cada subárbol", () => {
+  const personas = [
+    persona("padre", { hijos: ["hija-mayor", "hijo-menor"], conyuges: ["madre"], nacimiento: "1940-01-01" }),
+    persona("madre", { hijos: ["hija-mayor", "hijo-menor"], conyuges: ["padre"], nacimiento: "1942-01-01" }),
+    persona("hija-mayor", { padres: ["padre", "madre"], nacimiento: "1970-01-01" }),
+    persona("hijo-menor", { padres: ["padre", "madre"], nacimiento: "1974-01-01" }),
+  ];
+  const modelo = crearModeloArbol(personas);
+  const layout = calcularLayoutArbol(modelo);
+  const padre = layout.posiciones.get("padre");
+  const madre = layout.posiciones.get("madre");
+  const hija = layout.posiciones.get("hija-mayor");
+  const hijo = layout.posiciones.get("hijo-menor");
+
+  assert.ok(padre && madre && hija && hijo);
+  assert.equal(padre.y, madre.y, "la pareja debe compartir nivel generacional");
+  assert.equal(hija.y, hijo.y, "los hermanos deben compartir nivel generacional");
+  assert.equal(hija.y - padre.y, GEOMETRIA_ARBOL.separacionVertical);
+  assert.equal((padre.x + madre.x) / 2, (hija.x + hijo.x) / 2, "la unidad parental debe quedar centrada sobre la descendencia");
+  assert.ok(Math.abs(hijo.x - hija.x) >= GEOMETRIA_ARBOL.anchoNodo + GEOMETRIA_ARBOL.separacionEntreHermanos);
+  assert.deepEqual(diagnosticarLayoutArbol(modelo, layout), {
+    cantidadPersonas: personas.length,
+    cantidadPosicionadas: personas.length,
+    faltantes: [],
+    desconocidos: [],
+    solapamientos: [],
+  });
+});
+
+test("matrimonios sucesivos permanecen juntos y separan los hijos de cada unión", () => {
+  const personas = [
+    persona("progenitor", { hijos: ["hijo-a", "hijo-b", "hijo-c"], conyuges: ["pareja-a", "pareja-b", "pareja-c"], nacimiento: "1940-01-01" }),
+    persona("pareja-a", { hijos: ["hijo-a"], conyuges: ["progenitor"], nacimiento: "1941-01-01" }),
+    persona("pareja-b", { hijos: ["hijo-b"], conyuges: ["progenitor"], nacimiento: "1942-01-01" }),
+    persona("pareja-c", { hijos: ["hijo-c"], conyuges: ["progenitor"], nacimiento: "1943-01-01" }),
+    persona("hijo-a", { padres: ["progenitor", "pareja-a"], nacimiento: "1965-01-01" }),
+    persona("hijo-b", { padres: ["progenitor", "pareja-b"], nacimiento: "1970-01-01" }),
+    persona("hijo-c", { padres: ["progenitor", "pareja-c"], nacimiento: "1975-01-01" }),
+  ];
+  const layout = calcularLayoutArbol(crearModeloArbol(personas));
+  const parejas = ["progenitor", "pareja-a", "pareja-b", "pareja-c"].map((id) => layout.posiciones.get(id));
+  const hijos = ["hijo-a", "hijo-b", "hijo-c"].map((id) => layout.posiciones.get(id));
+
+  assert.equal(new Set(parejas.map((posicion) => posicion?.grupoFamiliarId)).size, 1);
+  assert.equal(new Set(parejas.map((posicion) => posicion?.y)).size, 1);
+  const hijosOrdenados = hijos.filter(Boolean).sort((a, b) => a.x - b.x);
+  for (let indice = 1; indice < hijosOrdenados.length; indice += 1) {
+    assert.ok(
+      hijosOrdenados[indice].x - hijosOrdenados[indice - 1].x >= GEOMETRIA_ARBOL.anchoNodo + GEOMETRIA_ARBOL.separacionUnidadesFamiliares,
+      "cada unión debe reservar una rama horizontal independiente",
+    );
+  }
+});
+
+test("una rama corta se alinea por generación con el cónyuge de una rama larga", () => {
+  const personas = [
+    persona("raiz-larga", { hijos: ["segunda-generacion"], nacimiento: "1900-01-01" }),
+    persona("segunda-generacion", { padres: ["raiz-larga"], hijos: ["persona-profunda"], nacimiento: "1930-01-01" }),
+    persona("persona-profunda", { padres: ["segunda-generacion"], conyuges: ["raiz-corta"], nacimiento: "1960-01-01" }),
+    persona("raiz-corta", { conyuges: ["persona-profunda"], nacimiento: "1962-01-01" }),
+  ];
+  const layout = calcularLayoutArbol(crearModeloArbol(personas));
+
+  assert.equal(layout.posiciones.get("persona-profunda")?.y, layout.posiciones.get("raiz-corta")?.y);
+  assert.equal(
+    layout.posiciones.get("persona-profunda")?.y - layout.posiciones.get("raiz-larga")?.y,
+    GEOMETRIA_ARBOL.separacionVertical * 2,
+  );
+});
+
+test("componentes distintos conservan un margen explícito y la fecha desplaza nodos aislados", () => {
+  const personas = [
+    persona("familia-a", { hijos: ["hija-a"], nacimiento: "1900-01-01" }),
+    persona("hija-a", { padres: ["familia-a"], nacimiento: "1930-01-01" }),
+    persona("familia-b", { hijos: ["hija-b"], nacimiento: "1905-01-01" }),
+    persona("hija-b", { padres: ["familia-b"], nacimiento: "1935-01-01" }),
+    persona("persona-aislada", { nacimiento: "1985-01-01" }),
+  ];
+  const modelo = crearModeloArbol(personas);
+  const layout = calcularLayoutArbol(modelo);
+  const limitesPorComponente = modelo.componentes.map((_componente, componenteIndice) => {
+    const nodos = layout.nodos.filter((nodo) => nodo.componenteIndice === componenteIndice);
+    return {
+      min: Math.min(...nodos.map((nodo) => nodo.x - GEOMETRIA_ARBOL.anchoNodo / 2)),
+      max: Math.max(...nodos.map((nodo) => nodo.x + GEOMETRIA_ARBOL.anchoNodo / 2)),
+    };
+  });
+  for (let indice = 1; indice < limitesPorComponente.length; indice += 1) {
+    assert.ok(
+      limitesPorComponente[indice].min - limitesPorComponente[indice - 1].max >= GEOMETRIA_ARBOL.separacionComponentes,
+      "los componentes no deben compactarse como si fueran hermanos",
+    );
+  }
+  assert.ok(layout.posiciones.get("persona-aislada").y > layout.posiciones.get("hija-a").y);
+});
+
+test("el layout propio es determinista y posiciona una sola vez a cada persona", () => {
+  const personas = [
+    persona("raiz-a", { hijos: ["a"], nacimiento: "1900-01-01" }),
+    persona("a", { padres: ["raiz-a"], conyuges: ["b"], nacimiento: "1930-01-01" }),
+    persona("raiz-b", { hijos: ["b"], nacimiento: "1901-01-01" }),
+    persona("b", { padres: ["raiz-b"], conyuges: ["a"], nacimiento: "1931-01-01" }),
+  ];
+  const modelo = crearModeloArbol(personas);
+  const primera = calcularLayoutArbol(modelo);
+  const segunda = calcularLayoutArbol(crearModeloArbol(structuredClone(personas)));
+
+  assert.deepEqual(primera.nodos, segunda.nodos);
+  assert.equal(primera.posiciones.size, personas.length);
+  assert.deepEqual(new Set(primera.nodos.map(({ id }) => id)), new Set(personas.map(({ id }) => id)));
+  assert.deepEqual(diagnosticarLayoutArbol(modelo, primera).solapamientos, []);
 });

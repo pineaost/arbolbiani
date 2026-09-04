@@ -45,10 +45,10 @@ body { @apply bg-background text-ink font-body antialiased; }
   .boton-secundario { @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-sakura-paper px-3 py-2 text-sm font-medium text-velvet shadow-sakura-card transition-[background-color,border-color,box-shadow] hover:border-sakura-bloom hover:bg-sakura-petal hover:shadow-sakura-card-hover disabled:cursor-not-allowed disabled:opacity-50; }
 }
 
-/* family-chart conserva su layout y relaciones: estas reglas sólo trabajan
-   sobre capas, color y tarjetas. La flora está fuera del SVG que recibe pan y
-   zoom, por eso permanece fija y no intercepta interacciones. */
-.arbol-mapa.f3 {
+/* El mapa usa coordenadas genealógicas propias. La flora está fuera de la
+   escena que recibe pan y zoom, por eso permanece fija y no intercepta las
+   interacciones. */
+.arbol-mapa {
   --female-color: rgb(var(--sakura-femenino));
   --male-color: rgb(var(--sakura-masculino));
   --genderless-color: rgb(var(--sakura-branch));
@@ -57,10 +57,15 @@ body { @apply bg-background text-ink font-body antialiased; }
   position: relative; z-index: 1; isolation: isolate;
   width: 100%; height: 100%; max-height: none; overflow: hidden;
   background: transparent; color: rgb(var(--sakura-ink));
+  cursor: grab; touch-action: none; user-select: none;
 }
+.arbol-mapa:active { cursor: grabbing; }
+.arbol-escena { position: absolute; inset: 0 auto auto 0; transform-origin: 0 0; will-change: transform; }
+.arbol-vinculos { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 
 .arbol-mapa path.link,
 .arbol-mapa path.arbol-vinculo-normalizado { fill: none; stroke: rgb(var(--sakura-vinculo)); stroke-width: 1.6px; stroke-linecap: round; stroke-linejoin: round; opacity: 0.76; transition: stroke 200ms ease; }
+.arbol-mapa path.arbol-vinculo-union-familiar[data-vinculo-modo="individual"] { stroke-width: 1.25px; stroke-dasharray: 5 5; opacity: 0.58; }
 .arbol-mapa .card_cont { pointer-events: none; }
 .arbol-mapa .card-inner, .arbol-mapa .card_cont .card { pointer-events: auto; }
 .arbol-mapa .card-inner { width: var(--arbol-nodo-ancho); height: var(--arbol-nodo-alto); overflow: visible; background: transparent; }
@@ -77,6 +82,10 @@ body { @apply bg-background text-ink font-body antialiased; }
   color: rgb(var(--sakura-ink));
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease;
 }
+.arbol-nodo-propio { position: absolute; height: var(--arbol-nodo-alto); margin: 0; appearance: none; text-align: left; user-select: none; }
+.arbol-mapa .arbol-nodo-femenino { --halo: var(--sakura-femenino); border-left-color: rgb(var(--sakura-femenino)); }
+.arbol-mapa .arbol-nodo-masculino { --halo: var(--sakura-masculino); border-left-color: rgb(var(--sakura-masculino)); }
+.arbol-mapa .arbol-nodo-sin-genero { --halo: var(--sakura-indefinido); border-left-color: rgb(var(--sakura-indefinido)); }
 .arbol-mapa .card-female .arbol-nodo { --halo: var(--sakura-femenino); border-left-color: rgb(var(--sakura-femenino)); }
 .arbol-mapa .card-male .arbol-nodo { --halo: var(--sakura-masculino); border-left-color: rgb(var(--sakura-masculino)); }
 .arbol-mapa .card-male .arbol-nodo.arbol-nodo-sin-genero, .arbol-mapa .card-female .arbol-nodo.arbol-nodo-sin-genero { --halo: var(--sakura-indefinido); border-left-color: rgb(var(--sakura-indefinido)); }
