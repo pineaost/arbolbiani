@@ -11,13 +11,13 @@ import type {
   VinculoFiliacionFicha,
 } from "@/lib/supabase/types";
 
-interface FilaFiliacionArbol {
+export interface FilaFiliacionArbol {
   id?: string;
   padre_id: string;
   hijo_id: string;
 }
 
-interface FilaConyugeArbol {
+export interface FilaConyugeArbol {
   id?: string;
   persona1_id: string;
   persona2_id: string;
@@ -29,6 +29,64 @@ interface PaginaSupabase<T> {
 }
 
 const TAMANIO_PAGINA_ARBOL = 1000;
+
+export type CodigoProblemaFilasArbol =
+  | "persona-duplicada"
+  | "referencia-ausente-filiacion"
+  | "referencia-ausente-conyuge"
+  | "auto-referencia-filiacion"
+  | "auto-referencia-conyuge"
+  | "filiacion-duplicada";
+
+export interface ProblemaFilasArbol {
+  codigo: CodigoProblemaFilasArbol;
+  filaId?: string;
+  ids: string[];
+  detalle: string;
+}
+
+/** Audita las filas crudas antes de que Set normalice o deduplique nada. */
+export function diagnosticarFilasArbol(
+  personas: Persona[],
+  filiaciones: FilaFiliacionArbol[],
+  conyuges: FilaConyugeArbol[],
+): ProblemaFilasArbol[] {
+  const problemas: ProblemaFilasArbol[] = [];
+  const ids = new Set<string>();
+  personas.forEach((persona) => {
+    if (ids.has(persona.id)) {
+      problemas.push({ codigo: "persona-duplicada", ids: [persona.id], detalle: `La persona ${persona.id} aparece mas de una vez.` });
+    }
+    ids.add(persona.id);
+  });
+  const filiacionesVistas = new Set<string>();
+  filiaciones.forEach((fila) => {
+    const filaId = fila.id;
+    if (fila.padre_id === fila.hijo_id) {
+      problemas.push({ codigo: "auto-referencia-filiacion", filaId, ids: [fila.padre_id], detalle: "Una filiacion vincula a una persona consigo misma." });
+    }
+    const ausentes = [fila.padre_id, fila.hijo_id].filter((id) => !ids.has(id));
+    if (ausentes.length > 0) {
+      problemas.push({ codigo: "referencia-ausente-filiacion", filaId, ids: ausentes, detalle: "Una filiacion referencia personas que no fueron recuperadas." });
+    }
+    const clave = `${fila.padre_id}->${fila.hijo_id}`;
+    if (filiacionesVistas.has(clave)) {
+      problemas.push({ codigo: "filiacion-duplicada", filaId, ids: [fila.padre_id, fila.hijo_id], detalle: "La misma filiacion aparece mas de una vez." });
+    }
+    filiacionesVistas.add(clave);
+  });
+  conyuges.forEach((fila) => {
+    const filaId = fila.id;
+    if (fila.persona1_id === fila.persona2_id) {
+      problemas.push({ codigo: "auto-referencia-conyuge", filaId, ids: [fila.persona1_id], detalle: "Un vinculo conyugal relaciona a una persona consigo misma." });
+    }
+    const ausentes = [fila.persona1_id, fila.persona2_id].filter((id) => !ids.has(id));
+    if (ausentes.length > 0) {
+      problemas.push({ codigo: "referencia-ausente-conyuge", filaId, ids: ausentes, detalle: "Un vinculo conyugal referencia personas que no fueron recuperadas." });
+    }
+  });
+  return problemas;
+}
 
 export async function obtenerTodasLasFilas<T>(
   obtenerPagina: (desde: number, hasta: number) => PromiseLike<PaginaSupabase<T>>,
@@ -77,6 +135,11 @@ export async function getPersonasArbol(): Promise<PersonaArbol[]> {
     throw new Error("No se pudo cargar el árbol familiar.");
   }
 
+  const problemas = diagnosticarFilasArbol(personasData.data, filiacionesData.data, conyugesData.data);
+  if (problemas.length > 0) {
+    console.error("[Árbol Biani] Se rechazaron datos relacionales inconsistentes:", problemas);
+    throw new Error(`El árbol contiene ${problemas.length} relaciones o personas inconsistentes. No se modificaron los datos.`);
+  }
   return normalizarPersonasArbol(personasData.data, filiacionesData.data, conyugesData.data);
 }
 
@@ -85,13 +148,15 @@ export function normalizarPersonasArbol(
   filiaciones: FilaFiliacionArbol[],
   conyuges: FilaConyugeArbol[],
 ): PersonaArbol[] {
-  const ids = new Set(personas.map((persona) => persona.id));
+  const problemas = diagnosticarFilasArbol(personas, filiaciones, conyuges);
+  if (problemas.length > 0) {
+    throw new Error(`No se pueden normalizar ${problemas.length} filas inconsistentes del árbol.`);
+  }
   const padresPorHijo = new Map<string, Set<string>>();
   const hijosPorPadre = new Map<string, Set<string>>();
   const conyugesPorPersona = new Map<string, Set<string>>();
 
   for (const fila of filiaciones) {
-    if (!ids.has(fila.padre_id) || !ids.has(fila.hijo_id)) continue;
     if (!padresPorHijo.has(fila.hijo_id)) padresPorHijo.set(fila.hijo_id, new Set());
     if (!hijosPorPadre.has(fila.padre_id)) hijosPorPadre.set(fila.padre_id, new Set());
     padresPorHijo.get(fila.hijo_id)?.add(fila.padre_id);
@@ -99,7 +164,6 @@ export function normalizarPersonasArbol(
   }
 
   for (const fila of conyuges) {
-    if (!ids.has(fila.persona1_id) || !ids.has(fila.persona2_id)) continue;
     if (!conyugesPorPersona.has(fila.persona1_id)) conyugesPorPersona.set(fila.persona1_id, new Set());
     if (!conyugesPorPersona.has(fila.persona2_id)) conyugesPorPersona.set(fila.persona2_id, new Set());
     conyugesPorPersona.get(fila.persona1_id)?.add(fila.persona2_id);

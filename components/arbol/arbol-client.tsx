@@ -12,6 +12,7 @@ import {
   crearVinculosVisualesArbol,
   diagnosticarLayoutArbol,
   diagnosticarModeloArbol,
+  diagnosticarVinculosVisualesArbol,
   GEOMETRIA_ARBOL,
 } from "@/lib/arbol-chart";
 import type { NodoPosicionadoArbol } from "@/lib/arbol-chart";
@@ -67,7 +68,7 @@ export function ArbolClient({ personas }: Props) {
       (rect.width - espacio * 2) / layout.ancho,
       (rect.height - espacio * 2) / layout.alto,
       1.12,
-    ), 0.08, 1.12);
+    ), 0.02, 1.12);
     actualizarVista({
       x: (rect.width - layout.ancho * escala) / 2,
       y: (rect.height - layout.alto * escala) / 2,
@@ -81,7 +82,7 @@ export function ArbolClient({ personas }: Props) {
     const rect = contenedor.getBoundingClientRect();
     const punto = centro ?? { x: rect.width / 2, y: rect.height / 2 };
     const actual = vistaRef.current;
-    const escala = limitar(actual.escala * cantidad, 0.08, 2.4);
+    const escala = limitar(actual.escala * cantidad, 0.02, 2.4);
     const proporcion = escala / actual.escala;
     actualizarVista({
       x: punto.x - (punto.x - actual.x) * proporcion,
@@ -118,17 +119,29 @@ export function ArbolClient({ personas }: Props) {
     if (process.env.NODE_ENV === "production") return;
     const diagnosticoModelo = diagnosticarModeloArbol(personas);
     const diagnosticoLayout = diagnosticarLayoutArbol(modeloArbol, layout);
+    const diagnosticoVinculos = diagnosticarVinculosVisualesArbol(modeloArbol, vinculosVisuales, nodosParaTrazado);
     const hayErrores = diagnosticoModelo.errores.length > 0
       || diagnosticoLayout.faltantes.length > 0
       || diagnosticoLayout.desconocidos.length > 0
-      || diagnosticoLayout.solapamientos.length > 0;
+      || diagnosticoLayout.solapamientos.length > 0
+      || diagnosticoLayout.filiacionesNoDescendentes.length > 0
+      || diagnosticoLayout.conyugesEnFilasDistintas.length > 0
+      || diagnosticoLayout.familiasConHijosEnFilasDistintas.length > 0
+      || diagnosticoVinculos.filiacionesFaltantes.length > 0
+      || diagnosticoVinculos.filiacionesDuplicadas.length > 0
+      || diagnosticoVinculos.vinculosConyugalesFaltantes.length > 0
+      || diagnosticoVinculos.vinculosConyugalesDuplicados.length > 0
+      || diagnosticoVinculos.personasVinculadasSinRepresentacion.length > 0
+      || diagnosticoVinculos.idsVisualesDuplicados.length > 0
+      || diagnosticoVinculos.vinculosSinTrazo.length > 0;
     (hayErrores ? console.error : console.info)("[Árbol Biani] Auditoría del modelo y layout familiar propio", {
       diagnosticoModelo,
       diagnosticoLayout,
+      diagnosticoVinculos,
       vinculosEsperados: vinculosVisuales.length,
       vinculosDibujados: trazos.length,
     });
-  }, [layout, modeloArbol, personas, trazos.length, vinculosVisuales.length]);
+  }, [layout, modeloArbol, nodosParaTrazado, personas, trazos.length, vinculosVisuales]);
 
   const iniciarArrastre = (event: ReactPointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("[data-persona-id]")) return;
