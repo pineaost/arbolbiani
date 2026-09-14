@@ -8,13 +8,14 @@ import { SakuraBackdrop } from "@/components/arbol/sakura-backdrop";
 import {
   calcularLayoutArbol,
   crearModeloArbol,
+  crearMarcosParejaArbol,
   diagnosticarLayoutArbol,
   diagnosticarGeometriaArbol,
   diagnosticarModeloArbol,
   diagnosticarVinculosVisualesArbol,
   GEOMETRIA_ARBOL,
 } from "@/lib/arbol-chart";
-import type { NodoPosicionadoArbol } from "@/lib/arbol-chart";
+import type { NodoPosicionadoArbol, ModeloArbol } from "@/lib/arbol-chart";
 import type { PersonaArbol } from "@/lib/supabase/types";
 
 interface Props { personas: PersonaArbol[]; }
@@ -32,12 +33,22 @@ const variablesGeometriaArbol = {
 } as CSSProperties;
 
 export function ArbolClient({ personas }: Props) {
+  const modeloArbol = useMemo(() => crearModeloArbol(personas), [personas]);
+  if (modeloArbol.problemas.length) return <div role="alert" className="m-6 rounded-xl border border-border bg-white p-6">
+    <h1 className="font-display text-2xl text-velvet">Hay relaciones que necesitan revisión</h1>
+    <p className="mt-3 text-sm text-ink/70">No se puede generar un árbol coherente con estos datos. Revisá las filiaciones de las personas indicadas en Archivo Familiar.</p>
+    <ul className="mt-3 list-inside list-disc text-sm text-ink/70">{modeloArbol.problemas.map((p,i)=><li key={i}>{[...new Set(p.ids)].map(id=>modeloArbol.personas.get(id)).filter((p):p is PersonaArbol=>!!p).map(nombreCompleto).join(" · ")}</li>)}</ul>
+    <Link href="/archivo" className="mt-4 inline-block text-sm text-velvet underline">Abrir Archivo Familiar</Link>
+  </div>;
+  return <MapaArbol personas={personas} modeloArbol={modeloArbol} />;
+}
+
+function MapaArbol({ personas, modeloArbol }: Props & { modeloArbol: ModeloArbol }) {
   const contenedorRef = useRef<HTMLDivElement | null>(null);
   const vistaRef = useRef<VistaMapa>({ x: 0, y: 0, escala: 1 });
   const arrastreRef = useRef<ArrastreMapa | null>(null);
   const [vista, setVista] = useState<VistaMapa>(vistaRef.current);
   const [personaSeleccionadaId, setPersonaSeleccionadaId] = useState<string | null>(null);
-  const modeloArbol = useMemo(() => crearModeloArbol(personas), [personas]);
   const layout = useMemo(() => calcularLayoutArbol(modeloArbol), [modeloArbol]);
   const vinculosVisuales = useMemo(() => layout.trazos.map(({ vinculo }) => vinculo), [layout]);
   const personaPorId = useMemo(() => new Map(personas.map((persona) => [persona.id, persona])), [personas]);
@@ -48,6 +59,10 @@ export function ArbolClient({ personas }: Props) {
     y: nodo.y,
   })), [layout]);
   const trazos = layout.trazos;
+  const marcosPareja = useMemo(() => crearMarcosParejaArbol(modeloArbol, layout), [modeloArbol, layout]);
+  const unidadSeleccionada = useMemo(() => new Set(personaSeleccionadaId
+    ? [personaSeleccionadaId, ...modeloArbol.conyugesPorPersona.get(personaSeleccionadaId) ?? []]
+    : []), [personaSeleccionadaId, modeloArbol]);
   const detalleZoom = vista.escala < 0.53 ? "lejos" : vista.escala < 0.9 ? "medio" : "cerca";
 
   const actualizarVista = useCallback((siguiente: VistaMapa) => {
@@ -207,15 +222,32 @@ export function ArbolClient({ personas }: Props) {
         }}
       >
         <svg className="arbol-vinculos" width={layout.ancho} height={layout.alto} viewBox={`0 0 ${layout.ancho} ${layout.alto}`} aria-hidden="true">
-          <g className="links_view">
-            {trazos.map(({ vinculo, trazo }) => trazo && <path
-              key={vinculo.id}
-              className={`arbol-vinculo-normalizado arbol-vinculo-${vinculo.tipo}`}
-              d={trazo.d}
-              data-vinculo-id={vinculo.id}
-              data-vinculo-tipo={vinculo.tipo}
-              data-vinculo-modo={trazo.modo}
+          <g className="arbol-marcos-pareja">
+            {marcosPareja.map(marco => <rect key={marco.id}
+              data-pareja-id={marco.id}
+              className={`arbol-marco-pareja${marco.ramaNumerosa ? " arbol-marco-pareja-rama-numerosa" : ""}${marco.personasIds.some(id => unidadSeleccionada.has(id)) ? " arbol-marco-pareja-seleccionada" : ""}`}
+              x={marco.x} y={marco.y} width={marco.ancho} height={marco.alto} rx={19}
             />)}
+          </g>
+          <g className="links_view">
+            {trazos.map(({ vinculo, trazo }) => {
+              if (!trazo) return null;
+              const ids = vinculo.tipo === "conyugal" ? [vinculo.origenId, vinculo.destinoId] : [...vinculo.progenitoresIds, ...vinculo.hijosIds];
+              const destacado = ids.some(id => unidadSeleccionada.has(id));
+              const esPareja = vinculo.tipo === "conyugal" || vinculo.progenitoresIds.length === 2;
+              return <g key={vinculo.id}
+                className={unidadSeleccionada.size ? destacado ? "arbol-vinculo-destacado" : "arbol-vinculo-contexto" : ""}
+                data-vinculo-id={vinculo.id}
+                data-vinculo-tipo={vinculo.tipo}
+                data-vinculo-modo={trazo.modo}
+              >
+                {trazo.partes.map(parte => <path key={parte.papel}
+                  className={`arbol-vinculo-normalizado arbol-vinculo-${vinculo.tipo} arbol-tramo-${parte.papel}`}
+                  d={parte.d}
+                />)}
+                {esPareja && <circle className="arbol-punto-union" cx={trazo.ancla.x} cy={trazo.ancla.y} r={2.6} />}
+              </g>;
+            })}
           </g>
         </svg>
         {layout.nodos.map((nodo) => {

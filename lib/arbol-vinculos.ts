@@ -1,10 +1,11 @@
 import { GEOMETRIA_ARBOL } from "./arbol-tipos";
-import type { NodoPosicionadoArbol, PuntoArbol, PuertoArbol, SegmentoArbol, TrazoVinculoArbol, VinculoVisualArbol, TrazoCalculadoArbol } from "./arbol-tipos";
+import type { NodoPosicionadoArbol, PuntoArbol, PuertoArbol, SegmentoArbol, TrazoVinculoArbol, VinculoVisualArbol, TrazoCalculadoArbol, PapelSegmentoArbol } from "./arbol-tipos";
 
 const W = GEOMETRIA_ARBOL.anchoNodo / 2, H = GEOMETRIA_ARBOL.altoNodo / 2;
 const EPS = 0.001;
 const igual = (a: PuntoArbol, b: PuntoArbol) => Math.abs(a.x - b.x) < EPS && Math.abs(a.y - b.y) < EPS;
 const numero = (n: number) => String(Math.round(n * 1000) / 1000);
+const pathSegmentos = (ss: SegmentoArbol[]) => ss.map(s => `M${numero(s.inicio.x)},${numero(s.inicio.y)} ${Math.abs(s.inicio.x - s.fin.x) < EPS ? `V${numero(s.fin.y)}` : `H${numero(s.fin.x)}`}`).join(" ");
 
 export function segmentoAtraviesaTarjeta(s: SegmentoArbol, n: NodoPosicionadoArbol) {
   if (Math.abs(s.inicio.x - s.fin.x) < EPS) return s.inicio.x > n.x - W + EPS && s.inicio.x < n.x + W - EPS
@@ -136,21 +137,22 @@ export function crearTrazosVinculosArbol(vinculos: VinculoVisualArbol[], nodosEn
   for (const plan of planes) {
     const { vinculo, padres, hijos } = plan;
     const ss: SegmentoArbol[] = [], puertos: PuertoArbol[] = [];
+    const agregar = (papel: PapelSegmentoArbol, tramos: SegmentoArbol[]) => ss.push(...tramos.map(s => ({ ...s, papel })));
     const cantidad = ocupados.get(plan.nivel)!.length;
     const puenteY = plan.nivel + H + 12 + plan.carril * GEOMETRIA_ARBOL.separacionCarriles;
     let ancla: PuntoArbol;
     if (plan.directa) {
       const a = { personaId: padres[0].data.id, x: padres[0].x + W, y: padres[0].y };
       const b = { personaId: padres[1].data.id, x: padres[1].x - W, y: padres[1].y };
-      puertos.push(a, b); ss.push(...ruta(a, b, nodos));
+      puertos.push(a, b); agregar("union", ruta(a, b, nodos));
       ancla = { x: (a.x + b.x) / 2, y: a.y };
     } else if (padres.length === 1) {
       const p = puertoInferior(padres[0], vinculo.id); puertos.push(p); ancla = p;
     } else {
       const ps = padres.map(n => puertoInferior(n, vinculo.id)); puertos.push(...ps);
       ancla = { x: (Math.min(...ps.map(p => p.x)) + Math.max(...ps.map(p => p.x))) / 2, y: puenteY };
-      for (const p of ps) ss.push(...ruta(p, { x: p.x, y: puenteY }, nodos));
-      ss.push(...ruta({ x: Math.min(...ps.map(p => p.x)), y: puenteY }, { x: Math.max(...ps.map(p => p.x)), y: puenteY }, nodos));
+      for (const p of ps) agregar("union", ruta(p, { x: p.x, y: puenteY }, nodos));
+      agregar("union", ruta({ x: Math.min(...ps.map(p => p.x)), y: puenteY }, { x: Math.max(...ps.map(p => p.x)), y: puenteY }, nodos));
     }
     if (hijos.length) {
       const yBus = plan.nivel + H + 24 + cantidad * GEOMETRIA_ARBOL.separacionCarriles + plan.carril * GEOMETRIA_ARBOL.separacionCarriles;
@@ -160,9 +162,9 @@ export function crearTrazosVinculosArbol(vinculos: VinculoVisualArbol[], nodosEn
       // hijos están a un lado o hay un solo hijo. No quedan cabos en el vacío.
       const minX = Math.min(ancla.x, ...destino.map(p => p.x));
       const maxX = Math.max(ancla.x, ...destino.map(p => p.x));
-      ss.push(...ruta(ancla, { x: ancla.x, y: yBus }, nodos));
-      ss.push(...ruta({ x: minX, y: yBus }, { x: maxX, y: yBus }, nodos));
-      for (const p of destino) ss.push(...ruta({ x: p.x, y: yBus }, p, nodos));
+      agregar("descendencia", ruta(ancla, { x: ancla.x, y: yBus }, nodos));
+      agregar(hijos.length > 1 ? "hermanos" : "descendencia", ruta({ x: minX, y: yBus }, { x: maxX, y: yBus }, nodos));
+      for (const p of destino) agregar("descendencia", ruta({ x: p.x, y: yBus }, p, nodos));
     }
     const unicos = new Map<string, SegmentoArbol>();
     ss.forEach(s => {
@@ -171,9 +173,10 @@ export function crearTrazosVinculosArbol(vinculos: VinculoVisualArbol[], nodosEn
     });
     const finales = [...unicos.values()];
     resultados.set(vinculo.id, {
-      d: finales.map(s => `M${numero(s.inicio.x)},${numero(s.inicio.y)} ${Math.abs(s.inicio.x - s.fin.x) < EPS ? `V${numero(s.fin.y)}` : `H${numero(s.fin.x)}`}`).join(" "),
+      d: pathSegmentos(finales),
       modo: vinculo.tipo === "union-familiar" ? "bus" : "curva", degradado: false,
       segmentos: finales, puertos, ancla,
+      partes: (["hermanos", "descendencia", "union"] as const).map(papel => ({ papel, d: pathSegmentos(finales.filter(s => s.papel === papel)) })).filter(p => p.d.length > 0),
     });
   }
   return vinculos.map(vinculo => ({ vinculo, trazo: resultados.get(vinculo.id) ?? null }));

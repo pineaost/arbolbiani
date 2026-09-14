@@ -3,3 +3,4 @@ export * from "./arbol-tipos";
 export * from "./arbol-modelo";
 export * from "./arbol-layout";
 export * from "./arbol-vinculos";
+export * from "./arbol-presentacion";

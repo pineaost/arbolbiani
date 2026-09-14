@@ -10,7 +10,7 @@ import { datosReales } from "./datos-reales.mjs";
 const require = createRequire(import.meta.url);
 const raiz = fileURLToPath(new URL("..", import.meta.url));
 const cargarModulo = (p, deps) => cargarTypescript(resolve(raiz, p), deps);
-const { calcularLayoutArbol, crearModeloArbol, crearTrazoVinculoArbol, crearTrazosVinculosArbol, crearVinculosVisualesArbol, diagnosticarGeometriaArbol, diagnosticarLayoutArbol, diagnosticarModeloArbol, diagnosticarVinculosVisualesArbol, GEOMETRIA_ARBOL } = cargarModulo("lib/arbol-chart.ts");
+const { calcularLayoutArbol, crearModeloArbol, crearTrazoVinculoArbol, crearTrazosVinculosArbol, crearVinculosVisualesArbol, crearMarcosParejaArbol, diagnosticarGeometriaArbol, diagnosticarLayoutArbol, diagnosticarModeloArbol, diagnosticarVinculosVisualesArbol, GEOMETRIA_ARBOL } = cargarModulo("lib/arbol-chart.ts");
 const { diagnosticarFilasArbol, normalizarPersonasArbol, obtenerTodasLasFilas } = cargarModulo("lib/relaciones.ts", { "@/lib/supabase/auth": {}, "@/lib/supabase/server": {}, "@/lib/personas": {} });
 const idsRenderizados = ps => calcularLayoutArbol(crearModeloArbol(ps)).nodos.map(n => n.id);
 function componente(modelo, id) { const c = modelo.componentes.find(c => c.ids.includes(id)); assert.ok(c); return c; }
@@ -116,8 +116,11 @@ test("cinco uniones reservan carriles sin extremos sueltos ni hijos de otra pare
 });
 
 test("la cronología de hermanos no depende del género ni de la edad de su pareja", () => {
-  const r = comprobarArbol([persona("p"),{...persona("mayor",{padres:["p"],nacimiento:"1970-01-01"}),genero:"femenino"},persona("menor",{padres:["p"],nacimiento:"1975-01-01",conyuges:["pareja"]}),persona("pareja",{nacimiento:"1960-01-01"})]);
-  assert.ok(r.layout.posiciones.get("mayor").x<r.layout.posiciones.get("menor").x);
+  const ps = [persona("p"),{...persona("mayor",{padres:["p"],nacimiento:"1970-01-01"}),genero:"femenino"},persona("mediano",{padres:["p"],nacimiento:"1972-01-01"}),persona("menor",{padres:["p"],nacimiento:"1975-01-01",conyuges:["pareja"]}),persona("pareja",{nacimiento:"1960-01-01"})];
+  const r = comprobarArbol(ps), ids = ["mayor","mediano","menor"].sort((a,b)=>r.layout.posiciones.get(a).x-r.layout.posiciones.get(b).x);
+  assert.ok(["mayor,mediano,menor","menor,mediano,mayor"].includes(ids.join(",")), "la rama puede orientarse hacia otra familia, conservando su orden cronológico");
+  const otra = calcularLayoutArbol(crearModeloArbol(ps.map(p=>({...p,genero:"no_definido"}))));
+  assert.deepEqual(otra.nodos,r.layout.nodos);
 });
 
 test("una madre aún no registrada no separa a los hermanos de generación", () => {
@@ -167,6 +170,34 @@ test("familias generadas reproduciblemente conservan continuidad al crecer y uni
       ps.push(persona(`g${nivel}-${i}`,{padres:[...new Set(padres)],nacimiento:`${1850+nivel*28}-01-01`}));
     }
     comprobarArbol(ps);
+  }
+});
+
+test("revisión final: Remigio y Esther se distinguen sin desplazar sus fichas ni incluir hermanos", () => {
+  const ps = JSON.parse(readFileSync(resolve(raiz,"Referencias/revision-layout/personas-revision-final.json"),"utf8"));
+  const r = comprobarArbol(ps), antes = structuredClone(r.layout.nodos);
+  const remigio = ps.find(p=>p.nombre==="Remigio Lorenzo"), esther=ps.find(p=>p.nombre==="Esther Iris");
+  const marcos = crearMarcosParejaArbol(r.modelo,r.layout), marco = marcos.find(m=>m.personasIds.includes(remigio.id));
+  assert.ok(marco.ramaNumerosa);
+  assert.deepEqual(new Set(marco.personasIds),new Set([remigio.id,esther.id]));
+  for(const n of r.layout.nodos) if(!marco.personasIds.includes(n.id)) {
+    assert.ok(n.x+88 <= marco.x || n.x-88 >= marco.x+marco.ancho || n.y+46 <= marco.y || n.y-46 >= marco.y+marco.alto, "el marco no debe agrupar una ficha ajena");
+  }
+  assert.deepEqual(r.layout.nodos,antes,"la presentación no toma decisiones de posición");
+  assert.ok(marcos.filter(m=>m.ramaNumerosa).length>1,"la solución se aplica a otras familias numerosas");
+});
+
+test("los marcos no sugieren parejas exclusivas cuando hay varios cónyuges", () => {
+  const r = comprobarArbol([persona("a",{conyuges:["b","c"]}),persona("b"),persona("c")]);
+  assert.deepEqual(crearMarcosParejaArbol(r.modelo,r.layout),[]);
+});
+
+test("la jerarquía visual conserva exactamente los mismos tramos y puertos", () => {
+  const r = comprobarArbol(datosReales());
+  for(const {trazo} of r.trazos) {
+    const partes = trazo.partes.flatMap(p=>p.d.split(/ (?=M)/)).sort();
+    assert.deepEqual(partes,trazo.d.split(/ (?=M)/).sort());
+    assert.ok(trazo.partes.every(p=>["union","descendencia","hermanos"].includes(p.papel)));
   }
 });
 test("una pareja con uno o varios hijos genera una sola unión familiar", () => {

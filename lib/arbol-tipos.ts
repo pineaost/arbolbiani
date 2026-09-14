@@ -17,6 +17,7 @@ export interface ComponenteArbol {
 }
 
 export type CodigoProblemaArbol =
+  | "persona-duplicada"
   | "referencia-ausente"
   | "auto-referencia-filiacion"
   | "auto-referencia-conyugal"
@@ -96,6 +97,7 @@ export interface TrazoVinculoArbol {
   segmentos: SegmentoArbol[];
   puertos: PuertoArbol[];
   ancla: PuntoArbol;
+  partes: Array<{ papel: PapelSegmentoArbol; d: string }>;
 }
 
 export interface DiagnosticoVinculosVisualesArbol {
@@ -114,6 +116,7 @@ export interface DiagnosticoVinculosVisualesArbol {
 
 
 export interface PuntoArbol { x: number; y: number; }
-export interface SegmentoArbol { inicio: PuntoArbol; fin: PuntoArbol; }
+export type PapelSegmentoArbol = "union" | "descendencia" | "hermanos";
+export interface SegmentoArbol { inicio: PuntoArbol; fin: PuntoArbol; papel?: PapelSegmentoArbol; }
 export interface PuertoArbol extends PuntoArbol { personaId: string; }
 export interface TrazoCalculadoArbol { vinculo: VinculoVisualArbol; trazo: TrazoVinculoArbol | null; }

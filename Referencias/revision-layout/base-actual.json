@@ -1,5 +1,5 @@
 {
-  "fuente": "Archivo local indicado en ARBOL_DATOS",
+  "fuente": "Referencias/revision-layout/personas-actuales.json",
   "modelo": {
     "errores": [],
     "cantidadPersonas": 121,
@@ -519,6 +519,10 @@
     "conyugesEnFilasDistintas": [],
     "familiasConHijosEnFilasDistintas": []
   },
+  "advertencias": [
+    "Progenitores en generaciones distintas: 3bfa04fc-dbe6-44da-aebb-5447d17960fa / 3e3ee4cd-aa95-4857-a202-1af13ac751a5. Se conserva la filiación y se conectan niveles distintos.",
+    "Hermanos por un progenitor en generaciones distintas: 10c2f52a-6675-4cf5-8569-2cb21523e189 / 2a7e0ed8-f106-4ea8-bf81-4143f4d72366. Se conserva la filiación y se conectan niveles distintos."
+  ],
   "relaciones": {
     "filiacionesEsperadas": 169,
     "filiacionesRepresentadas": 169,

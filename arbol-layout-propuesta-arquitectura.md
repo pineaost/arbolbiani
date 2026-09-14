@@ -1,5 +1,7 @@
 # Árbol Biani — Rediseño del layout genealógico
 
+> Documento histórico. La implementación se revisó integralmente el 14/09/2026 y utiliza un layout por generaciones con restricciones familiares, sin padre principal ni `family-chart`. La arquitectura vigente, las pruebas y los casos pendientes están en [la revisión del sistema](Referencias/revision-layout/REVISION.md). Las recomendaciones y referencias a funciones que siguen abajo describen una propuesta anterior.
+
 ## 1. Diagnóstico del problema actual
 
 Hoy el posicionamiento **no lo calcula esta aplicación**: lo calcula `family-chart` (`calculateTree`, vía `createChart` en `arbol-client.tsx`). El código propio (`arbol-chart.ts`) solo hace dos cosas:

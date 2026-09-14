@@ -75,3 +75,9 @@ modelo de datos pueda evolucionar sin reestructurar la aplicación.
 
 Pensado para Vercel: conectar el repositorio, configurar las mismas
 variables de entorno que en `.env.local`, y cada push a `main` despliega.
+
+## Verificación del árbol
+
+`npm test` comprueba el modelo, las posiciones y la continuidad geométrica sobre casos de regresión y copias de los datos reales. `npm run audit:arbol` genera el diagnóstico y una vista SVG reproducibles en `Referencias/revision-layout/actual.*`; se puede indicar otra copia de personas mediante `ARBOL_DATOS`.
+
+La [revisión del sistema de árbol](Referencias/revision-layout/REVISION.md) documenta el algoritmo y las comprobaciones. La única fuente de posiciones y trazos es `calcularLayoutArbol`; la interfaz consume ese resultado sin recolocar fichas.

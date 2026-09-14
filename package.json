@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test tests/arbol-chart.test.mjs"
+    "test": "node --test tests/arbol-chart.test.mjs",
+    "audit:arbol": "node scripts/auditar-arbol.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.1",

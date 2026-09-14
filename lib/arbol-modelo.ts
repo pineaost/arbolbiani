@@ -59,13 +59,14 @@ function detectarCiclosFiliacion(
 
 export function crearModeloArbol(entrada: PersonaArbol[]): ModeloArbol {
   const personas = new Map<string, PersonaArbol>();
+  const problemasPorClave = new Map<string, ProblemaArbol>();
   [...entrada].sort((a, b) => claveOrden(a).localeCompare(claveOrden(b), "es")).forEach((persona) => {
     if (!personas.has(persona.id)) personas.set(persona.id, persona);
+    else problemasPorClave.set(`persona-duplicada:${persona.id}`, { codigo: "persona-duplicada", ids: [persona.id], detalle: `La persona ${persona.id} aparece más de una vez.` });
   });
   const padresPorHijo = new Map<string, Set<string>>();
   const hijosPorPadre = new Map<string, Set<string>>();
   const conyugesPorPersona = new Map<string, Set<string>>();
-  const problemasPorClave = new Map<string, ProblemaArbol>();
 
   const registrarProblema = (problema: ProblemaArbol) => {
     const idsClave = problema.codigo.includes("conyugal") ? [...problema.ids].sort() : problema.ids;
