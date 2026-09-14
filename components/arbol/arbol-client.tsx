@@ -8,9 +8,8 @@ import { SakuraBackdrop } from "@/components/arbol/sakura-backdrop";
 import {
   calcularLayoutArbol,
   crearModeloArbol,
-  crearTrazoVinculoArbol,
-  crearVinculosVisualesArbol,
   diagnosticarLayoutArbol,
+  diagnosticarGeometriaArbol,
   diagnosticarModeloArbol,
   diagnosticarVinculosVisualesArbol,
   GEOMETRIA_ARBOL,
@@ -40,7 +39,7 @@ export function ArbolClient({ personas }: Props) {
   const [personaSeleccionadaId, setPersonaSeleccionadaId] = useState<string | null>(null);
   const modeloArbol = useMemo(() => crearModeloArbol(personas), [personas]);
   const layout = useMemo(() => calcularLayoutArbol(modeloArbol), [modeloArbol]);
-  const vinculosVisuales = useMemo(() => crearVinculosVisualesArbol(modeloArbol), [modeloArbol]);
+  const vinculosVisuales = useMemo(() => layout.trazos.map(({ vinculo }) => vinculo), [layout]);
   const personaPorId = useMemo(() => new Map(personas.map((persona) => [persona.id, persona])), [personas]);
   const personaSeleccionada = personaSeleccionadaId ? personaPorId.get(personaSeleccionadaId) ?? null : null;
   const nodosParaTrazado = useMemo<NodoPosicionadoArbol[]>(() => layout.nodos.map((nodo) => ({
@@ -48,10 +47,7 @@ export function ArbolClient({ personas }: Props) {
     x: nodo.x,
     y: nodo.y,
   })), [layout]);
-  const trazos = useMemo(() => vinculosVisuales.map((vinculo) => ({
-    vinculo,
-    trazo: crearTrazoVinculoArbol(vinculo, nodosParaTrazado),
-  })).filter((item) => item.trazo !== null), [nodosParaTrazado, vinculosVisuales]);
+  const trazos = layout.trazos;
   const detalleZoom = vista.escala < 0.53 ? "lejos" : vista.escala < 0.9 ? "medio" : "cerca";
 
   const actualizarVista = useCallback((siguiente: VistaMapa) => {
@@ -119,8 +115,12 @@ export function ArbolClient({ personas }: Props) {
     if (process.env.NODE_ENV === "production") return;
     const diagnosticoModelo = diagnosticarModeloArbol(personas);
     const diagnosticoLayout = diagnosticarLayoutArbol(modeloArbol, layout);
+    const geometria = diagnosticarGeometriaArbol(trazos, nodosParaTrazado);
     const diagnosticoVinculos = diagnosticarVinculosVisualesArbol(modeloArbol, vinculosVisuales, nodosParaTrazado);
-    const hayErrores = diagnosticoModelo.errores.length > 0
+    const hayErrores = geometria.sinTrazo.length > 0 || geometria.desconectados.length > 0
+      || geometria.extremosLibres.length > 0 || geometria.puertosInvalidos.length > 0
+      || geometria.tarjetasAtravesadas.length > 0 || geometria.noFinitos.length > 0
+      || diagnosticoModelo.errores.length > 0
       || diagnosticoLayout.faltantes.length > 0
       || diagnosticoLayout.desconocidos.length > 0
       || diagnosticoLayout.solapamientos.length > 0
@@ -138,10 +138,12 @@ export function ArbolClient({ personas }: Props) {
       diagnosticoModelo,
       diagnosticoLayout,
       diagnosticoVinculos,
+      geometria,
+      advertencias: layout.advertencias,
       vinculosEsperados: vinculosVisuales.length,
       vinculosDibujados: trazos.length,
     });
-  }, [layout, modeloArbol, nodosParaTrazado, personas, trazos.length, vinculosVisuales]);
+  }, [layout, modeloArbol, nodosParaTrazado, personas, trazos, vinculosVisuales]);
 
   const iniciarArrastre = (event: ReactPointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("[data-persona-id]")) return;
@@ -188,7 +190,7 @@ export function ArbolClient({ personas }: Props) {
     <div
       className={`arbol-mapa arbol-mapa-propio arbol-zoom-${detalleZoom}`}
       ref={contenedorRef}
-      style={variablesGeometriaArbol}
+      style={{ ...variablesGeometriaArbol, "--arbol-grosor-vinculo": `${Math.max(1.6, 0.75 / vista.escala)}px` } as CSSProperties}
       aria-label="Mapa interactivo del árbol genealógico"
       onPointerDown={iniciarArrastre}
       onPointerMove={arrastrar}

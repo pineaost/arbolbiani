@@ -1,0 +1,110 @@
+{
+  "fuente": "Foto real existente: diagnostico-family-chart-datos-reales.json (11 personas)",
+  "modelo": {
+    "errores": [],
+    "cantidadPersonas": 11,
+    "cantidadComponentes": 1,
+    "cantidadFiliaciones": 11,
+    "cantidadUnionesFamiliares": 4,
+    "cantidadVinculosConyugales": 1,
+    "raicesLayout": [
+      "4d73b14d-5b01-409d-9c4f-e531531dab17",
+      "8da1bca4-d5a3-4673-86f4-08aafdc68c66"
+    ],
+    "componentes": [
+      {
+        "ids": [
+          "7f4f4a8c-febe-4c24-959c-245cae154dcc",
+          "91ccacce-d573-4c98-ac7c-8a20039a57b6",
+          "eb13f625-d872-4ddd-a536-4ed230a22e68",
+          "6c5bc2b0-d608-4bd9-ac15-45ecda0c45f5",
+          "539fe98d-41d8-44f3-a411-cfc46d1b2fba",
+          "4d73b14d-5b01-409d-9c4f-e531531dab17",
+          "0f3fcd02-411d-4f68-84e9-756a8038f6ca",
+          "8da1bca4-d5a3-4673-86f4-08aafdc68c66",
+          "b7f328c5-0573-48df-8d2a-ddb2cd755cb7",
+          "998fec4c-22d6-4e72-83b4-c64fdcb0de9d",
+          "bf16c77a-7b1e-4c3b-88f0-07347e03103a"
+        ],
+        "raicesAncestrales": [
+          "4d73b14d-5b01-409d-9c4f-e531531dab17",
+          "8da1bca4-d5a3-4673-86f4-08aafdc68c66",
+          "b7f328c5-0573-48df-8d2a-ddb2cd755cb7",
+          "998fec4c-22d6-4e72-83b4-c64fdcb0de9d"
+        ]
+      }
+    ],
+    "familias": [
+      {
+        "id": "0f3fcd02-411d-4f68-84e9-756a8038f6ca:8da1bca4-d5a3-4673-86f4-08aafdc68c66",
+        "progenitores": [
+          "0f3fcd02-411d-4f68-84e9-756a8038f6ca",
+          "8da1bca4-d5a3-4673-86f4-08aafdc68c66"
+        ],
+        "hijos": [
+          "7f4f4a8c-febe-4c24-959c-245cae154dcc"
+        ]
+      },
+      {
+        "id": "7f4f4a8c-febe-4c24-959c-245cae154dcc:b7f328c5-0573-48df-8d2a-ddb2cd755cb7",
+        "progenitores": [
+          "7f4f4a8c-febe-4c24-959c-245cae154dcc",
+          "b7f328c5-0573-48df-8d2a-ddb2cd755cb7"
+        ],
+        "hijos": [
+          "91ccacce-d573-4c98-ac7c-8a20039a57b6",
+          "539fe98d-41d8-44f3-a411-cfc46d1b2fba",
+          "bf16c77a-7b1e-4c3b-88f0-07347e03103a"
+        ]
+      },
+      {
+        "id": "7f4f4a8c-febe-4c24-959c-245cae154dcc:998fec4c-22d6-4e72-83b4-c64fdcb0de9d",
+        "progenitores": [
+          "7f4f4a8c-febe-4c24-959c-245cae154dcc",
+          "998fec4c-22d6-4e72-83b4-c64fdcb0de9d"
+        ],
+        "hijos": [
+          "6c5bc2b0-d608-4bd9-ac15-45ecda0c45f5"
+        ]
+      },
+      {
+        "id": "4d73b14d-5b01-409d-9c4f-e531531dab17",
+        "progenitores": [
+          "4d73b14d-5b01-409d-9c4f-e531531dab17"
+        ],
+        "hijos": [
+          "0f3fcd02-411d-4f68-84e9-756a8038f6ca"
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "cantidadPersonas": 11,
+    "cantidadPosicionadas": 11,
+    "faltantes": [],
+    "desconocidos": [],
+    "solapamientos": [],
+    "filiacionesNoDescendentes": [],
+    "conyugesEnFilasDistintas": [],
+    "familiasConHijosEnFilasDistintas": []
+  },
+  "relaciones": {
+    "filiacionesEsperadas": 11,
+    "filiacionesRepresentadas": 11,
+    "filiacionesFaltantes": [],
+    "filiacionesDuplicadas": [],
+    "vinculosConyugalesEsperados": 4,
+    "vinculosConyugalesRepresentados": 4,
+    "vinculosConyugalesFaltantes": [],
+    "vinculosConyugalesDuplicados": [],
+    "personasVinculadasSinRepresentacion": [],
+    "idsVisualesDuplicados": [],
+    "vinculosSinTrazo": []
+  },
+  "medidas": {
+    "ancho": 1272,
+    "alto": 680,
+    "distanciaHorizontalMedia": 189.66666666666666,
+    "distanciaHorizontalMaxima": 378
+  }
+}
