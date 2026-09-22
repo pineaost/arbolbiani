@@ -174,9 +174,10 @@ test("la muestra histórica real conserva cada puerto, familia y tarjeta sin cru
 
 test("base actual: 121 personas y todas sus filiaciones permanecen conectadas", () => {
   const ps = JSON.parse(readFileSync(resolve(raiz, "Referencias/revision-layout/personas-actuales.json"), "utf8"));
-  const { modelo, layout } = comprobarArbol(ps);
+  const { modelo, layout, geometria } = comprobarArbol(ps);
   assert.equal(ps.length, 121);
   assert.ok(layout.ancho < 12000, "el ancho anterior era de 21944 px; ahora también se alinean medios hermanos");
+  assert.ok(geometria.cruces <= 8, "la disposición anterior tenía 14 contactos entre vínculos");
   for (const f of modelo.familias) {
     if (f.progenitores.length === 2) {
       const [a,b] = f.progenitores.map(id => layout.posiciones.get(id));
@@ -251,6 +252,41 @@ test("la cronología de hermanos no depende del género ni de la edad de su pare
   assert.ok(["mayor,mediano,menor","menor,mediano,mayor"].includes(ids.join(",")), "la rama puede orientarse hacia otra familia, conservando su orden cronológico");
   const otra = calcularLayoutArbol(crearModeloArbol(ps.map(p=>({...p,genero:"no_definido"}))));
   assert.deepEqual(otra.nodos,r.layout.nodos);
+});
+
+test("once hermanos sin fechas se reordenan por las ascendencias externas manteniendo parejas y generación", () => {
+  const ps = [persona("padre"), persona("madre"), ...Array.from({ length: 11 }, (_, i) =>
+    persona(`h${String(i).padStart(2, "0")}`, { padres: ["padre", "madre"], nacimiento: null,
+      conyuges: i === 3 ? ["pareja-a"] : i === 7 ? ["pareja-b"] : [] })),
+    persona("raiz-a"), persona("raiz-b"), persona("pareja-a", { padres: ["raiz-a"] }), persona("pareja-b", { padres: ["raiz-b"] })];
+  const { layout, geometria } = comprobarArbol(ps);
+  const hermanos = layout.nodos.filter(n => n.id.startsWith("h")).sort((a, b) => a.x - b.x);
+  assert.equal(new Set(hermanos.map(n => n.generacion)).size, 1);
+  assert.equal(new Set(hermanos.map(n => n.y)).size, 1);
+  assert.ok(hermanos.findIndex(n => n.id === "h03") >= 8 && hermanos.findIndex(n => n.id === "h07") >= 8,
+    "ambos matrimonios deben acercarse al borde de las ascendencias externas, aunque antes estuvieran en el medio");
+  for (const [h, p] of [["h03", "pareja-a"], ["h07", "pareja-b"]]) {
+    assert.equal(Math.abs(layout.posiciones.get(h).x - layout.posiciones.get(p).x), 196);
+  }
+  assert.ok(geometria.cruces <= 1);
+  assert.deepEqual(calcularLayoutArbol(crearModeloArbol([...ps].reverse())).nodos, layout.nodos);
+});
+
+test("los codos suaves conservan puertos y bifurcaciones exactos y no entran en tarjetas", () => {
+  const vinculo = { id: "salto", tipo: "union-familiar", familiaId: "salto", progenitoresIds: ["p"], hijosIds: ["h"] };
+  const nodos = [{ data: { id: "p" }, x: 0, y: 0 }, { data: { id: "obstaculo" }, x: 0, y: 172 }, { data: { id: "h" }, x: 0, y: 516 }];
+  const trazos = crearTrazosVinculosArbol([vinculo], nodos);
+  comprobarGeometria(trazos, nodos);
+  assert.match(trazos[0].trazo.d, / Q/, "los desvíos deben tener esquinas suavizadas");
+  assert.doesNotMatch(trazos[0].trazo.d, /NaN|Infinity/);
+  // Verifica la curva dibujada, además de los segmentos usados por el router.
+  for (const match of trazos[0].trazo.d.matchAll(/L(-?[\d.]+),(-?[\d.]+) Q(-?[\d.]+),(-?[\d.]+) (-?[\d.]+),(-?[\d.]+)/g)) {
+    const [ax, ay, bx, by, cx, cy] = match.slice(1).map(Number);
+    for (let i = 0; i <= 20; i++) {
+      const t = i / 20, x = (1-t)**2*ax+2*(1-t)*t*bx+t*t*cx, y = (1-t)**2*ay+2*(1-t)*t*by+t*t*cy;
+      assert.ok(nodos.every(n => Math.abs(n.x-x) >= 88-0.001 || Math.abs(n.y-y) >= 46-0.001));
+    }
+  }
 });
 
 test("una madre aún no registrada no separa a los hermanos de generación", () => {

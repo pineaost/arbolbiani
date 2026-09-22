@@ -5,7 +5,55 @@ const W = GEOMETRIA_ARBOL.anchoNodo / 2, H = GEOMETRIA_ARBOL.altoNodo / 2;
 const EPS = 0.001;
 const igual = (a: PuntoArbol, b: PuntoArbol) => Math.abs(a.x - b.x) < EPS && Math.abs(a.y - b.y) < EPS;
 const numero = (n: number) => String(Math.round(n * 1000) / 1000);
-const pathSegmentos = (ss: SegmentoArbol[]) => ss.map(s => `M${numero(s.inicio.x)},${numero(s.inicio.y)} ${Math.abs(s.inicio.x - s.fin.x) < EPS ? `V${numero(s.fin.y)}` : `H${numero(s.fin.x)}`}`).join(" ");
+/** Redondea sólo codos de grado dos. Bifurcaciones, anclas y puertos quedan
+ * exactos para no cortar la continuidad de un bus ni despegarlo de una ficha.
+ * Los segmentos ortogonales siguen siendo la geometría canónica del routing.
+ */
+function pathSegmentos(ss: SegmentoArbol[], red: SegmentoArbol[], protegidos: PuntoArbol[], nodos: NodoPosicionadoArbol[]) {
+  const clave = (p: PuntoArbol) => `${numero(p.x)},${numero(p.y)}`;
+  const vecinos = new Map<string, number[]>();
+  ss.forEach((s, i) => [s.inicio, s.fin].forEach(p => {
+    const indices = vecinos.get(clave(p)) ?? []; indices.push(i); vecinos.set(clave(p), indices);
+  }));
+  const unir = (p: PuntoArbol) => vecinos.get(clave(p))?.length === 2
+    && !protegidos.some(q => igual(p, q)) && red.filter(s => contiene(s, p)).length === 2;
+  const vistos = new Set<number>(), paths: string[] = [];
+  const par = (p: PuntoArbol) => `${numero(p.x)},${numero(p.y)}`;
+  for (let i = 0; i < ss.length; i++) {
+    if (vistos.has(i)) continue;
+    const puntos = [ss[i].inicio, ss[i].fin]; vistos.add(i);
+    const extender = () => {
+      while (unir(puntos[puntos.length - 1])) {
+        const ultimo = puntos[puntos.length - 1];
+        const siguiente = vecinos.get(clave(ultimo))!.find(j => !vistos.has(j));
+        if (siguiente === undefined) break;
+        vistos.add(siguiente);
+        const s = ss[siguiente]; puntos.push(igual(s.inicio, ultimo) ? s.fin : s.inicio);
+      }
+    };
+    extender(); puntos.reverse(); extender();
+    let d = `M${par(puntos[0])}`;
+    for (let j = 1; j < puntos.length - 1; j++) {
+      const a = puntos[j - 1], b = puntos[j], c = puntos[j + 1];
+      const ab = Math.abs(a.x - b.x) + Math.abs(a.y - b.y), bc = Math.abs(c.x - b.x) + Math.abs(c.y - b.y);
+      const radio = Math.min(4, ab / 2, bc / 2);
+      const entrada = { x: b.x + (a.x - b.x) / ab * radio, y: b.y + (a.y - b.y) / ab * radio };
+      const salida = { x: b.x + (c.x - b.x) / bc * radio, y: b.y + (c.y - b.y) / bc * radio };
+      const codo = (Math.abs(a.x - b.x) < EPS) !== (Math.abs(b.x - c.x) < EPS);
+      // La curva queda dentro de este rectángulo: si toca una tarjeta se deja
+      // el codo original, incluso en corredores de sólo unos pocos píxeles.
+      const libre = !nodos.some(n => Math.max(entrada.x, salida.x) > n.x - W + EPS
+        && Math.min(entrada.x, salida.x) < n.x + W - EPS && Math.max(entrada.y, salida.y) > n.y - H + EPS
+        && Math.min(entrada.y, salida.y) < n.y + H - EPS);
+      d += codo && libre ? ` L${par(entrada)} Q${par(b)} ${par(salida)}` : ` L${par(b)}`;
+    }
+    const fin = puntos[puntos.length - 1];
+    paths.push(puntos.length === 2
+      ? `${d} ${Math.abs(puntos[0].x - fin.x) < EPS ? `V${numero(fin.y)}` : `H${numero(fin.x)}`}`
+      : `${d} L${par(fin)}`);
+  }
+  return paths.join(" ");
+}
 
 export function segmentoAtraviesaTarjeta(s: SegmentoArbol, n: NodoPosicionadoArbol) {
   if (Math.abs(s.inicio.x - s.fin.x) < EPS) return s.inicio.x > n.x - W + EPS && s.inicio.x < n.x + W - EPS
@@ -172,11 +220,14 @@ export function crearTrazosVinculosArbol(vinculos: VinculoVisualArbol[], nodosEn
       unicos.set(clave, s);
     });
     const finales = [...unicos.values()];
+    const dibujar = (tramos: SegmentoArbol[]) => pathSegmentos(tramos, finales, [...puertos, ancla], nodos);
+    const partes = (["hermanos", "descendencia", "union"] as const)
+      .map(papel => ({ papel, d: dibujar(finales.filter(s => s.papel === papel)) })).filter(p => p.d.length > 0);
     resultados.set(vinculo.id, {
-      d: pathSegmentos(finales),
+      d: partes.map(p => p.d).join(" "),
       modo: vinculo.tipo === "union-familiar" ? "bus" : "curva", degradado: false,
       segmentos: finales, puertos, ancla,
-      partes: (["hermanos", "descendencia", "union"] as const).map(papel => ({ papel, d: pathSegmentos(finales.filter(s => s.papel === papel)) })).filter(p => p.d.length > 0),
+      partes,
     });
   }
   return vinculos.map(vinculo => ({ vinculo, trazo: resultados.get(vinculo.id) ?? null }));

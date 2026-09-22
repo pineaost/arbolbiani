@@ -1,7 +1,7 @@
 import type { ModeloArbol, LayoutArbol, PosicionPersonaArbol } from "./arbol-tipos";
 import { GEOMETRIA_ARBOL } from "./arbol-tipos";
 import { claveOrden, crearVinculosVisualesArbol } from "./arbol-modelo";
-import { espacioEntreFilasArbol, crearTrazosVinculosArbol } from "./arbol-vinculos";
+import { espacioEntreFilasArbol, crearTrazosVinculosArbol, diagnosticarGeometriaArbol } from "./arbol-vinculos";
 
 class Grupos {
   private representantes = new Map<string, string>();
@@ -102,6 +102,10 @@ interface Bloque {
 }
 const pasoPareja = GEOMETRIA_ARBOL.anchoNodo + GEOMETRIA_ARBOL.separacionPareja;
 const media = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+const mediana = (xs: number[]) => {
+  const orden = [...xs].sort((a, b) => a - b), medio = Math.floor(orden.length / 2);
+  return orden.length % 2 ? orden[medio] : (orden[medio - 1] + orden[medio]) / 2;
+};
 
 // Proyección isotónica: el mínimo desplazamiento cuadrático que respeta todas
 // las separaciones de una fila. No hay empujes tardíos de tarjetas individuales.
@@ -125,6 +129,7 @@ function proyectarFila(fila: Bloque[], objetivos: number[], pesos: number[], gap
  * raíz técnica, subárbol descartado ni coordenadas obtenidas del DOM.
  */
 function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArbol {
+  const ordenarPorConexiones = inicio >= 4;
   if (modelo.problemas.length) throw new Error(`No se puede representar un árbol con relaciones inconsistentes: ${modelo.problemas.map(p => p.detalle).join(" ")}`);
   if (!modelo.personas.size) return { posiciones: new Map(), nodos: [], ancho: 0, alto: 0, limites: { minX: 0, minY: 0, maxX: 0, maxY: 0 }, advertencias: [], trazos: [] };
   const { generaciones, advertencias } = ordenarGeneraciones(modelo);
@@ -177,8 +182,8 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
     const niveles = [...filas.keys()].sort((a, b) => a - b);
     const claveBloque = (b: Bloque) => [...b.personas].sort(comparar)[0];
     for (const fila of filas.values()) {
-      fila.sort((a, b) => inicio === 1 ? comparar(a.referente,b.referente)
-        : inicio === 2 ? comparar(b.referente,a.referente)
+      fila.sort((a, b) => inicio === 1 || inicio === 4 ? comparar(a.referente,b.referente)
+        : inicio === 2 || inicio === 5 ? comparar(b.referente,a.referente)
         : (inicio === 3 ? -1 : 1) * a.familia.localeCompare(b.familia) || comparar(claveBloque(a), claveBloque(b)));
       proyectarFila(fila, fila.map(() => 0), fila.map(() => 1), gap);
     }
@@ -206,6 +211,9 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
     const costo = () => {
       const edges = familias.flatMap(f => f.hijos.map(h => ({ f: f.id, a: media(f.progenitores.map(x)), b: x(h), desde: Math.max(...f.progenitores.map(p => generaciones.get(p)!)), hasta: generaciones.get(h)! })));
       let valor = edges.reduce((s, e) => s + (e.a - e.b) ** 2, 0);
+      if (ordenarPorConexiones) for (const [a, b] of parejas) {
+        if (ids.has(a)) valor += (x(a) - x(b)) ** 2;
+      }
       for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
         const a = edges[i], b = edges[j];
         if (a.f !== b.f && a.desde === b.desde && a.hasta === b.hasta && (a.a - b.a) * (a.b - b.b) < 0) valor += pasoPareja ** 2 * 16;
@@ -218,8 +226,8 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
       const direccion = pasada % 2 ? "hijos" : "padres";
       for (const nivel of pasada % 2 ? [...niveles].reverse() : niveles) {
         const fila = filas.get(nivel)!;
-        // Hermanos permanecen en una misma tanda cronológica; las tandas y
-        // parejas se ordenan por todas sus conexiones a la fila vecina.
+        // Las tandas familiares permanecen contiguas. Sólo se permutan bloques
+        // completos: nunca separar cónyuges para acercar una ascendencia.
         const tandas = new Map<string, Bloque[]>();
         fila.forEach(b => { const bs = tandas.get(b.familiaOrden) ?? []; bs.push(b); tandas.set(b.familiaOrden, bs); });
         const orden = [...tandas.values()].sort((a, b) => {
@@ -240,7 +248,35 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
             return preferencias.reduce((s,x)=>s+(x-centro)**2,0);
           };
           const inversa = [...tanda].reverse();
-          return costoOrden(inversa) < costoOrden(tanda) - 0.001 ? inversa : tanda;
+          let elegida = costoOrden(inversa) < costoOrden(tanda) - 0.001 ? inversa : tanda;
+          if (ordenarPorConexiones && tanda.length > 2) {
+            const centro = media(tanda.map(b => b.x));
+            const externos = (b: Bloque) => b.personas.flatMap(p => {
+              // Ascendencia del otro integrante de una pareja: orienta al
+              // hermano hacia el borde que mira a esa rama, sin mezclar tandas.
+              const padres = [...modelo.padresPorHijo.get(p) ?? []];
+              return padres.includes(b.familiaOrden) ? [] : padres.map(x);
+            });
+            const preferencias = new Map(tanda.map(b => {
+              const xs = externos(b);
+              return [b.id, xs.length ? mediana(xs) : centro];
+            }));
+            const conectada = [...tanda].sort((a, b) => preferencias.get(a.id)! - preferencias.get(b.id)!
+              || comparar(a.referente, b.referente) || a.id.localeCompare(b.id));
+            if (costoOrden(conectada) < costoOrden(elegida) - 0.001) elegida = conectada;
+            // Intercambios vecinos acotados permiten sacar un hermano del
+            // medio sin imponer que toda la tanda invierta su cronología.
+            for (let vuelta = 0; vuelta < 3; vuelta++) {
+              let cambio = false;
+              for (let i = 0; i < elegida.length - 1; i++) {
+                const prueba = [...elegida];
+                [prueba[i], prueba[i + 1]] = [prueba[i + 1], prueba[i]];
+                if (costoOrden(prueba) < costoOrden(elegida) - 0.001) { elegida = prueba; cambio = true; }
+              }
+              if (!cambio) break;
+            }
+          }
+          return elegida;
         });
         filas.set(nivel, orden);
         for (const b of orden) if (b.personas.length > 1) {
@@ -286,14 +322,35 @@ export function calcularLayoutArbol(modelo: ModeloArbol): LayoutArbol {
   // Distintos órdenes iniciales deterministas evitan que un matrimonio quede
   // atrapado entre ramas por el orden casual de sus ids. Se comparan relaciones
   // completas; no se elige una ascendencia que las demás deban seguir.
-  const puntuar = (l: LayoutArbol) => modelo.familias.reduce((s,f) => {
-    const centro = media(f.progenitores.map(p=>l.posiciones.get(p)!.x));
-    return s + f.hijos.reduce((t,h)=>t+(centro-l.posiciones.get(h)!.x)**2,0);
-  }, 0);
-  let mejor = calcularLayoutCandidato(modelo, 0), costo = puntuar(mejor);
-  for(let inicio=1;inicio<4;inicio++) {
-    const candidato = calcularLayoutCandidato(modelo,inicio), valor = puntuar(candidato);
-    if(valor < costo - 0.001) { mejor=candidato; costo=valor; }
+  const puntuar = (l: LayoutArbol) => {
+    const g = diagnosticarGeometriaArbol(l.trazos, l.nodos.map(n => ({ data: { id: n.id }, x: n.x, y: n.y })));
+    // Comparación lexicográfica: una reducción de ancho nunca compra cruces
+    // adicionales. Se evalúa el routing final, no sólo aristas imaginarias.
+    return [g.tarjetasAtravesadas.length + g.desconectados.length + g.puertosInvalidos.length,
+      g.cruces, g.longitud, l.ancho];
+  };
+  const menor = (a: number[], b: number[]) => {
+    for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 0.001) return a[i] < b[i];
+    return false;
+  };
+  const candidatos = Array.from({ length: 6 }, (_, inicio) => calcularLayoutCandidato(modelo, inicio));
+  const distanciaMaxima = (l: LayoutArbol) => Math.max(0,
+    ...modelo.familias.flatMap(f => {
+      const centro = media(f.progenitores.map(p => l.posiciones.get(p)!.x));
+      return f.hijos.map(h => Math.abs(centro - l.posiciones.get(h)!.x));
+    }),
+    ...[...modelo.conyugesPorPersona].flatMap(([p, parejas]) => [...parejas].map(q =>
+      Math.abs(l.posiciones.get(p)!.x - l.posiciones.get(q)!.x))),
+  );
+  const distancias = candidatos.map(distanciaMaxima);
+  // No eliminar un cruce a costa de estirar una filiación mucho más que en
+  // las otras soluciones. El límite es relativo a los datos, no a apellidos.
+  const limite = Math.max(pasoPareja * 2, Math.min(...distancias) * 1.25);
+  const admisibles = candidatos.filter((_, i) => distancias[i] <= limite + 0.001);
+  let mejor = admisibles[0], costo = puntuar(mejor);
+  for (const candidato of admisibles.slice(1)) {
+    const valor = puntuar(candidato);
+    if(menor(valor, costo)) { mejor=candidato; costo=valor; }
   }
   return mejor;
 }
