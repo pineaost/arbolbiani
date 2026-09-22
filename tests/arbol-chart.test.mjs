@@ -38,77 +38,133 @@ function comprobarArbol(personas) {
   return { modelo, layout, nodos, vinculos, trazos, geometria };
 }
 
-test("el filtro conserva exactamente todas, admite ninguna y compacta ramas independientes", () => {
-  const ps = ["a", "b", "c", "d"].flatMap(id => [
-    { ...persona(id, { hijos: [`${id}-hijo`] }), apellido: id.toUpperCase() },
-    persona(`${id}-hijo`, { padres: [id] }),
+const { FAMILIAS_PRINCIPALES, getFamiliaPrincipal, obtenerFamiliasDePersonas } = cargarModulo("lib/familias.ts");
+const { filtrarEntradasBitacora } = cargarModulo("lib/bitacora-filtro.ts");
+const miembro = (id, apellido, relaciones = {}) => ({ ...persona(id, relaciones), apellido });
+const seleccionar = (modelo, ...ids) => filtrarModeloArbol(modelo, obtenerFamiliasArbol(modelo), new Set(ids));
+
+test("las cuatro familias normalizan variantes históricas sin modificar los datos", () => {
+  assert.deepEqual(FAMILIAS_PRINCIPALES.map(f => f.nombre), ["Biani", "Della Paolera", "Acevey", "Podrecca"]);
+  for (const [apellido, esperado] of [
+    ["Acevey", "acevey"], ["Acebey", "acevey"], ["Asebey", "acevey"], ["  ÁCEBEY  ", "acevey"],
+    ["Della Paolera", "della-paolera"], ["Della Paoelra", "della-paolera"],
+    [" DELLA   PAOELRA ", "della-paolera"], ["Della-Paolera", "della-paolera"],
+    ["biáni", "biani"], ["PODRECCA", "podrecca"], ["González", null], ["", null],
+    ["Bianchini", null], ["Biani González", null],
+  ]) {
+    const p = { apellido };
+    assert.equal(getFamiliaPrincipal(p), esperado, apellido);
+    assert.equal(p.apellido, apellido);
+  }
+  assert.deepEqual(obtenerFamiliasDePersonas([{ apellido: "Biani" }, { apellido: "Podrecca" }, { apellido: "Biani" }]), new Set(["biani", "podrecca"]));
+});
+
+test("todas conserva el modelo completo, ninguna vacía el árbol y dos ramas independientes se compactan", () => {
+  const ps = FAMILIAS_PRINCIPALES.flatMap(f => [
+    miembro(f.id, f.nombre, { hijos: [`${f.id}-hijo`] }),
+    miembro(`${f.id}-hijo`, f.nombre, { padres: [f.id] }),
   ]);
+  ps.push(miembro("aislado", "González"));
   const modelo = crearModeloArbol(ps);
   const familias = obtenerFamiliasArbol(modelo);
-  assert.deepEqual(familias.map(f => f.nombre), ["A", "B", "C", "D"]);
-  assert.equal(filtrarModeloArbol(modelo, familias, new Set(familias.map(f => f.id))), modelo);
-  const vacio = filtrarModeloArbol(modelo, familias, new Set());
-  assert.equal(vacio.personas.size, 0);
-  assert.deepEqual(calcularLayoutArbol(vacio).trazos, []);
-  const filtrado = filtrarModeloArbol(modelo, familias, new Set([familias[0].id, familias[3].id]));
+  assert.equal(familias.length, 4, "un apellido externo no crea otra opción");
+  assert.equal(seleccionar(modelo, ...familias.map(f => f.id)), modelo, "incluye también aislados externos con todas activas");
+  assert.equal(seleccionar(modelo).personas.size, 0);
+  assert.deepEqual(calcularLayoutArbol(seleccionar(modelo)).trazos, []);
+  const filtrado = seleccionar(modelo, "biani", "podrecca");
   assert.equal(filtrado.componentes.length, 2);
-  assert.deepEqual(new Set(filtrado.personas.keys()), new Set(["a", "a-hijo", "d", "d-hijo"]));
+  assert.deepEqual(new Set(filtrado.personas.keys()), new Set(["biani", "biani-hijo", "podrecca", "podrecca-hijo"]));
   const { layout } = comprobarArbol([...filtrado.personas.values()]);
   assert.ok(layout.ancho < calcularLayoutArbol(modelo).ancho);
-  assert.equal(modelo.personas.size, 8, "no mutar los datos originales");
+  assert.equal(modelo.personas.size, 9);
 });
 
-test("familias conectadas comparten descendientes sin duplicarlos ni arrastrar ascendencias ocultas", () => {
+test("la rama conserva parejas externas con ascendencia propia, coprogenitores e hijos de distinto apellido", () => {
   const ps = [
-    { ...persona("a", { hijos: ["a-hijo"] }), apellido: "A" },
-    persona("a-hijo", { conyuges: ["b-hija", "pareja"], hijos: ["compartido"] }),
-    { ...persona("b", { hijos: ["b-hija"] }), apellido: "B" },
-    persona("b-hija", { hijos: ["compartido"] }),
-    persona("pareja"),
-    persona("compartido", { padres: ["a-hijo", "b-hija"] }),
-    { ...persona("c", { conyuges: ["b-hija"] }), apellido: "C" },
-    { ...persona("aislado"), apellido: "A" },
+    miembro("a", "Biani", { conyuges: ["pareja"], hijos: ["hijo", "hija"] }),
+    miembro("pareja", "González", { padres: ["abuelo-externo"], hijos: ["hijo", "medio-hermano"] }),
+    miembro("abuelo-externo", "González"),
+    miembro("hijo", "González", { padres: ["a", "pareja"], hijos: ["nieto"] }),
+    miembro("nieto", "Otro"),
+    miembro("hija", "Biani", { padres: ["a", "coprogenitor"] }),
+    miembro("coprogenitor", "Otro"),
+    miembro("medio-hermano", "González"),
+    miembro("aislado", "Otro"),
   ];
-  const modelo = crearModeloArbol(ps);
-  const familias = obtenerFamiliasArbol(modelo);
-  assert.equal(familias.filter(f => f.nombre === "A").length, 2, "no unir apellidos sin parentesco");
-  const a = familias.find(f => f.raices.includes("a"));
-  const b = familias.find(f => f.raices.includes("b"));
-  const soloA = filtrarModeloArbol(modelo, familias, new Set([a.id]));
-  assert.deepEqual(new Set(soloA.personas.keys()), new Set(["a", "a-hijo", "pareja", "compartido"]));
-  assert.deepEqual(soloA.personas.get("compartido").padres_ids, ["a-hijo"]);
+  const modelo = crearModeloArbol(ps), antes = structuredClone(ps);
+  const filtrado = seleccionar(modelo, "biani");
+  assert.deepEqual(new Set(filtrado.personas.keys()), new Set(["a", "pareja", "hijo", "hija", "nieto", "coprogenitor"]));
+  assert.ok(filtrado.conyugesPorPersona.get("a").has("pareja"));
+  assert.deepEqual(new Set(filtrado.padresPorHijo.get("hijo")), new Set(["a", "pareja"]));
+  assert.deepEqual(new Set(filtrado.padresPorHijo.get("hija")), new Set(["a", "coprogenitor"]));
+  comprobarArbol([...filtrado.personas.values()]);
+  assert.deepEqual(ps, antes, "no modificar apellidos ni relaciones originales");
+});
+
+test("ramas conectadas comparten hijos y parejas sin duplicarlos ni expandir la otra ascendencia", () => {
+  const modelo = crearModeloArbol([
+    miembro("a", "Biani", { hijos: ["a-hijo"] }),
+    miembro("a-hijo", "Biani", { conyuges: ["b-hija"], hijos: ["compartido"] }),
+    miembro("b", "Podrecca", { hijos: ["b-hija"] }),
+    miembro("b-hija", "Podrecca", { hijos: ["compartido"] }),
+    miembro("compartido", "Otro", { padres: ["a-hijo", "b-hija"] }),
+  ]);
+  const soloA = seleccionar(modelo, "biani");
+  assert.equal(soloA.personas.has("b-hija"), true, "la pareja sigue visible como contexto");
+  assert.equal(soloA.personas.has("b"), false, "no arrastrar la rama de la pareja");
   comprobarArbol([...soloA.personas.values()]);
-  const ambas = filtrarModeloArbol(modelo, familias, new Set([a.id, b.id]));
+  const ambas = seleccionar(modelo, "biani", "podrecca");
   const { layout } = comprobarArbol([...ambas.personas.values()]);
   assert.equal(layout.nodos.filter(n => n.id === "compartido").length, 1);
-  assert.deepEqual(new Set(ambas.padresPorHijo.get("compartido")), new Set(["a-hijo", "b-hija"]));
+  assert.equal(ambas.personas.size, 5);
 });
 
-test("seleccionar extremos unidos indirectamente permite separar el componente original", () => {
-  const ps = [
-    { ...persona("a", { hijos: ["a-hijo"] }), apellido: "A" },
-    persona("a-hijo", { conyuges: ["b-hijo"] }),
-    { ...persona("b", { hijos: ["b-hijo", "b-hija"] }), apellido: "B" },
-    persona("b-hijo"), persona("b-hija", { conyuges: ["c-hija"] }),
-    { ...persona("c", { hijos: ["c-hija"] }), apellido: "C" }, persona("c-hija"),
-  ];
-  const modelo = crearModeloArbol(ps), familias = obtenerFamiliasArbol(modelo);
+test("familias unidas indirectamente pueden mostrarse como componentes independientes", () => {
+  const modelo = crearModeloArbol([
+    miembro("a", "Biani", { conyuges: ["b-hijo"] }),
+    miembro("b", "Acevey", { hijos: ["b-hijo", "b-hija"] }),
+    miembro("b-hijo", "Acebey"), miembro("b-hija", "Asebey", { conyuges: ["c"] }),
+    miembro("c", "Podrecca"),
+  ]);
   assert.equal(modelo.componentes.length, 1);
-  const filtrado = filtrarModeloArbol(modelo, familias, new Set(familias.filter(f => f.nombre !== "B").map(f => f.id)));
+  const filtrado = seleccionar(modelo, "biani", "podrecca");
   assert.equal(filtrado.componentes.length, 2);
-  assert.equal(filtrado.conyugesPorPersona.size, 0);
+  assert.equal(filtrado.personas.has("b"), false);
   comprobarArbol([...filtrado.personas.values()]);
 });
 
-test("las raíces de la muestra actual cubren todas las personas y cada familia puede renderizarse sola", () => {
+test("las cuatro familias de la muestra actual se renderizan solas con sus variantes y vínculos completos", () => {
   const ps = JSON.parse(readFileSync(resolve(raiz, "Referencias/revision-layout/personas-actuales.json"), "utf8"));
   const modelo = crearModeloArbol(ps), familias = obtenerFamiliasArbol(modelo);
-  assert.deepEqual(new Set(familias.flatMap(f => [...f.personasIds])), new Set(modelo.personas.keys()));
+  assert.equal(familias.length, 4);
   for (const familia of familias) {
-    const filtrado = filtrarModeloArbol(modelo, familias, new Set([familia.id]));
+    const filtrado = seleccionar(modelo, familia.id);
+    for (const p of ps.filter(p => getFamiliaPrincipal(p) === familia.id)) assert.ok(filtrado.personas.has(p.id));
     assert.deepEqual(filtrado.problemas, []);
     comprobarArbol([...filtrado.personas.values()]);
   }
+});
+
+test("Bitácora combina familias normalizadas con tipo y persona sin buscar apellidos en el texto", () => {
+  const apellidos = ["Biani", "Podrecca", "Acevey", "Acebey", "Asebey", "Della Paolera", "Della Paoelra", "González"];
+  const entradas = apellidos.map((apellido, i) => ({
+    id: `e${i}`, tipo: i === 3 ? "documento_pendiente" : "nota", persona_id: `p${i}`,
+    persona: { id: `p${i}`, nombre: "Persona", apellido }, contenido: "Biani Podrecca Acevey Della Paolera",
+  }));
+  entradas.push({ id: "general", tipo: "nota", persona_id: null, persona: null, contenido: "Biani" });
+  const filtrar = (familias, opciones = {}) => filtrarEntradasBitacora(entradas, { tipo: "todas", personaId: "", familias: new Set(familias), ...opciones }).map(e => e.id);
+  assert.deepEqual(filtrar([]), entradas.map(e => e.id));
+  assert.deepEqual(filtrar(["biani"]), ["e0"]);
+  assert.deepEqual(filtrar(["podrecca"]), ["e1"]);
+  assert.deepEqual(filtrar(["acevey"]), ["e2", "e3", "e4"]);
+  assert.deepEqual(filtrar(["della-paolera"]), ["e5", "e6"]);
+  assert.deepEqual(filtrar(["biani", "podrecca"]), ["e0", "e1"]);
+  assert.deepEqual(filtrar(FAMILIAS_PRINCIPALES.map(f => f.id)), entradas.slice(0, 7).map(e => e.id));
+  assert.deepEqual(filtrar(["acevey"], { tipo: "documento_pendiente", personaId: "p3" }), ["e3"]);
+  assert.deepEqual(filtrar(["biani"], { tipo: "documento_pendiente", personaId: "p3" }), []);
+  assert.deepEqual(filtrar(["acevey"], { tipo: "nota", personaId: "p3" }), []);
+  assert.deepEqual(filtrar([], { personaId: "p7" }), ["e7"]);
+  assert.equal(new Set(filtrar(["acevey", "della-paolera"])).size, 5);
 });
 
 test("la muestra histórica real conserva cada puerto, familia y tarjeta sin cruces", () => {

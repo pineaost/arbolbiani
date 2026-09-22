@@ -289,7 +289,7 @@ function MapaArbol({ personas: personasCompletas, modeloArbol: modeloCompleto }:
         })}
       </div>
     </div>
-    <FiltroFamilias familias={familias} activas={familiasActivas} modelo={modeloCompleto} onCambiar={cambiarFamilias} />
+    <FiltroFamilias familias={familias} activas={familiasActivas} onCambiar={cambiarFamilias} />
     {personas.length === 0 && <div role="status" className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6">
       <div className="arbol-filtro-superficie max-w-sm rounded-2xl border p-6 text-center">
         <h2 className="font-display text-2xl text-velvet">Ninguna familia seleccionada</h2>

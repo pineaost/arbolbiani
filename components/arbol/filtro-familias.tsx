@@ -3,12 +3,10 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import type { FamiliaFiltroArbol } from "@/lib/arbol-filtro";
-import type { ModeloArbol } from "@/lib/arbol-chart";
 
-export function FiltroFamilias({ familias, activas, modelo, onCambiar }: {
+export function FiltroFamilias({ familias, activas, onCambiar }: {
   familias: FamiliaFiltroArbol[];
   activas: ReadonlySet<string>;
-  modelo: ModeloArbol;
   onCambiar: (ids: Set<string>) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -46,15 +44,10 @@ export function FiltroFamilias({ familias, activas, modelo, onCambiar }: {
             if (event.target.checked) siguientes.add(familia.id); else siguientes.delete(familia.id);
             onCambiar(siguientes);
           }} />
-          <span className="min-w-0 break-words">{familia.nombre}
-            <span className="mt-0.5 block text-xs text-ink/55">{familia.raices.map(id => {
-              const p = modelo.personas.get(id)!;
-              return `${p.nombre} ${p.apellido}`.trim();
-            }).join(" · ")}</span>
-          </span>
+          <span className="min-w-0 break-words">{familia.nombre}</span>
         </label>)}
       </div>
-      <p className="mt-2 px-1 text-xs leading-5 text-ink/55">Los descendientes compartidos siguen visibles si alguna de sus familias está activa.</p>
+      <p className="mt-2 px-1 text-xs leading-5 text-ink/55">Incluye descendientes y parejas. Las personas compartidas aparecen una sola vez.</p>
     </section>}
   </div>;
 }

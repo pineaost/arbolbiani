@@ -1,48 +1,35 @@
 import type { ModeloArbol } from "./arbol-tipos";
 import { crearModeloArbol } from "./arbol-modelo";
+import { FAMILIAS_PRINCIPALES, getFamiliaPrincipal, type FamiliaPrincipalId } from "./familias";
 
 export interface FamiliaFiltroArbol {
-  id: string;
+  id: FamiliaPrincipalId;
   nombre: string;
-  raices: string[];
   personasIds: Set<string>;
 }
 
-/** Las opciones se calculan sobre el modelo completo, nunca sobre el filtrado.
- * Un apellido agrupa raíces del mismo componente, no personas sin parentesco.
+/** La pertenencia se calcula sobre el modelo completo, nunca sobre el filtrado.
+ * Descendientes compartidos pueden pertenecer a varias ramas. Las personas de
+ * contexto no se usan como semillas: una pareja no arrastra su otra familia.
  */
 export function obtenerFamiliasArbol(modelo: ModeloArbol): FamiliaFiltroArbol[] {
-  const familias: FamiliaFiltroArbol[] = [];
-  for (const componente of modelo.componentes) {
-    const porApellido = new Map<string, FamiliaFiltroArbol>();
-    for (const id of componente.raicesAncestrales) {
-      const persona = modelo.personas.get(id)!;
-      const nombre = persona.apellido.trim() || persona.nombre.trim() || "Sin apellido";
-      const clave = nombre.normalize("NFC").toLocaleLowerCase("es");
-      const familia = porApellido.get(clave) ?? { id: `raiz:${id}`, nombre, raices: [], personasIds: new Set<string>() };
-      familia.raices.push(id);
-      porApellido.set(clave, familia);
+  return FAMILIAS_PRINCIPALES.map(({ id, nombre }) => {
+    const descendientes = new Set<string>();
+    const cola = [...modelo.personas.values()].filter(p => getFamiliaPrincipal(p) === id).map(p => p.id);
+    for (let i = 0; i < cola.length; i += 1) {
+      const personaId = cola[i];
+      if (descendientes.has(personaId)) continue;
+      descendientes.add(personaId);
+      cola.push(...modelo.hijosPorPadre.get(personaId) ?? []);
     }
-    for (const familia of porApellido.values()) {
-      const cola = [...familia.raices];
-      for (let i = 0; i < cola.length; i += 1) {
-        const id = cola[i];
-        if (familia.personasIds.has(id)) continue;
-        familia.personasIds.add(id);
-        cola.push(...modelo.hijosPorPadre.get(id) ?? []);
-      }
-      // Parejas sin ascendencia ni descendencia propia acompañan la rama.
-      // No recorrer matrimonios hacia otras raíces: reintroduciría familias ocultas.
-      for (const id of [...familia.personasIds]) {
-        for (const pareja of modelo.conyugesPorPersona.get(id) ?? []) {
-          if (!(modelo.padresPorHijo.get(pareja)?.size) && !(modelo.hijosPorPadre.get(pareja)?.size)
-            && !componente.raicesAncestrales.includes(pareja)) familia.personasIds.add(pareja);
-        }
-      }
-      familias.push(familia);
+    const personasIds = new Set(descendientes);
+    for (const personaId of descendientes) {
+      // También preserva coprogenitores aunque no exista matrimonio registrado.
+      for (const padre of modelo.padresPorHijo.get(personaId) ?? []) personasIds.add(padre);
+      for (const pareja of modelo.conyugesPorPersona.get(personaId) ?? []) personasIds.add(pareja);
     }
-  }
-  return familias;
+    return { id, nombre, personasIds };
+  });
 }
 
 export function filtrarModeloArbol(modelo: ModeloArbol, familias: FamiliaFiltroArbol[], activas: ReadonlySet<string>): ModeloArbol {
