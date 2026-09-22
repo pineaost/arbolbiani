@@ -104,6 +104,8 @@ body { @apply bg-background text-ink font-body antialiased; }
 
 .arbol-control { display: inline-flex; min-height: 40px; min-width: 40px; align-items: center; justify-content: center; color: rgb(var(--sakura-muted)); transition: background-color 150ms ease, color 150ms ease; }
 .arbol-control:hover, .arbol-control:focus-visible { background: rgb(var(--sakura-petal)); color: rgb(var(--sakura-plum)); outline: none; }
+.arbol-filtro-superficie { border-color: rgb(var(--sakura-line)); background: rgb(var(--sakura-paper) / 0.97); box-shadow: var(--sakura-shadow-float); }
+.arbol-mapa + .arbol-filtro-familias { background: transparent !important; box-shadow: none !important; }
 .arbol-mapa + div, .arbol-mapa ~ aside { border-color: rgb(var(--sakura-line)) !important; background: rgb(var(--sakura-paper)) !important; box-shadow: var(--sakura-shadow-float) !important; backdrop-filter: none !important; }
 
 /* Sidebar: panel lavanda + sakura gráfica estática detrás de la navegación. */

@@ -5,6 +5,8 @@ import { Minus, Move, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { SakuraBackdrop } from "@/components/arbol/sakura-backdrop";
+import { FiltroFamilias } from "@/components/arbol/filtro-familias";
+import { filtrarModeloArbol, obtenerFamiliasArbol } from "@/lib/arbol-filtro";
 import {
   calcularLayoutArbol,
   crearModeloArbol,
@@ -43,7 +45,12 @@ export function ArbolClient({ personas }: Props) {
   return <MapaArbol personas={personas} modeloArbol={modeloArbol} />;
 }
 
-function MapaArbol({ personas, modeloArbol }: Props & { modeloArbol: ModeloArbol }) {
+function MapaArbol({ personas: personasCompletas, modeloArbol: modeloCompleto }: Props & { modeloArbol: ModeloArbol }) {
+  const familias = useMemo(() => obtenerFamiliasArbol(modeloCompleto), [modeloCompleto]);
+  const [familiasOcultas, setFamiliasOcultas] = useState<Set<string>>(() => new Set());
+  const familiasActivas = useMemo(() => new Set(familias.filter(f => !familiasOcultas.has(f.id)).map(f => f.id)), [familias, familiasOcultas]);
+  const modeloArbol = useMemo(() => filtrarModeloArbol(modeloCompleto, familias, familiasActivas), [modeloCompleto, familias, familiasActivas]);
+  const personas = useMemo(() => modeloArbol === modeloCompleto ? personasCompletas : [...modeloArbol.personas.values()], [modeloArbol, modeloCompleto, personasCompletas]);
   const contenedorRef = useRef<HTMLDivElement | null>(null);
   const vistaRef = useRef<VistaMapa>({ x: 0, y: 0, escala: 1 });
   const arrastreRef = useRef<ArrastreMapa | null>(null);
@@ -65,6 +72,12 @@ function MapaArbol({ personas, modeloArbol }: Props & { modeloArbol: ModeloArbol
     : []), [personaSeleccionadaId, modeloArbol]);
   const detalleZoom = vista.escala < 0.53 ? "lejos" : vista.escala < 0.9 ? "medio" : "cerca";
 
+  const cambiarFamilias = (activas: Set<string>) => {
+    setFamiliasOcultas(new Set(familias.filter(f => !activas.has(f.id)).map(f => f.id)));
+    setPersonaSeleccionadaId(null);
+    arrastreRef.current = null;
+  };
+
   const actualizarVista = useCallback((siguiente: VistaMapa) => {
     vistaRef.current = siguiente;
     setVista(siguiente);
@@ -74,7 +87,7 @@ function MapaArbol({ personas, modeloArbol }: Props & { modeloArbol: ModeloArbol
     const contenedor = contenedorRef.current;
     if (!contenedor || layout.ancho === 0 || layout.alto === 0) return;
     const rect = contenedor.getBoundingClientRect();
-    const espacio = 48;
+    const espacio = familiasOcultas.size ? 80 : 48;
     const escala = limitar(Math.min(
       (rect.width - espacio * 2) / layout.ancho,
       (rect.height - espacio * 2) / layout.alto,
@@ -85,7 +98,7 @@ function MapaArbol({ personas, modeloArbol }: Props & { modeloArbol: ModeloArbol
       y: (rect.height - layout.alto * escala) / 2,
       escala,
     });
-  }, [actualizarVista, layout.alto, layout.ancho]);
+  }, [actualizarVista, layout, familiasOcultas.size]);
 
   const modificarZoom = useCallback((cantidad: number, centro?: { x: number; y: number }) => {
     const contenedor = contenedorRef.current;
@@ -196,7 +209,7 @@ function MapaArbol({ personas, modeloArbol }: Props & { modeloArbol: ModeloArbol
     modificarZoom(Math.exp(-event.deltaY * 0.0012), { x: event.clientX - rect.left, y: event.clientY - rect.top });
   };
 
-  if (personas.length === 0) {
+  if (personasCompletas.length === 0) {
     return <div className="flex min-h-[calc(100svh-4rem)] items-center justify-center px-6 md:min-h-screen"><div className="max-w-sm text-center"><h1 className="font-display text-3xl text-velvet">Árbol</h1><p className="mt-3 text-sm leading-6 text-ink/60">Cuando haya personas cargadas, el mapa familiar aparecerá acá.</p><Link href="/archivo" className="mt-5 inline-flex text-sm text-velvet underline underline-offset-4">Ir al Archivo Familiar</Link></div></div>;
   }
 
@@ -221,7 +234,7 @@ function MapaArbol({ personas, modeloArbol }: Props & { modeloArbol: ModeloArbol
           transform: `translate3d(${vista.x}px, ${vista.y}px, 0) scale(${vista.escala})`,
         }}
       >
-        <svg className="arbol-vinculos" width={layout.ancho} height={layout.alto} viewBox={`0 0 ${layout.ancho} ${layout.alto}`} aria-hidden="true">
+        <svg className="arbol-vinculos" width={layout.ancho} height={layout.alto} viewBox={`0 0 ${Math.max(1, layout.ancho)} ${Math.max(1, layout.alto)}`} aria-hidden="true">
           <g className="arbol-marcos-pareja">
             {marcosPareja.map(marco => <rect key={marco.id}
               data-pareja-id={marco.id}
@@ -276,6 +289,14 @@ function MapaArbol({ personas, modeloArbol }: Props & { modeloArbol: ModeloArbol
         })}
       </div>
     </div>
+    <FiltroFamilias familias={familias} activas={familiasActivas} modelo={modeloCompleto} onCambiar={cambiarFamilias} />
+    {personas.length === 0 && <div role="status" className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6">
+      <div className="arbol-filtro-superficie max-w-sm rounded-2xl border p-6 text-center">
+        <h2 className="font-display text-2xl text-velvet">Ninguna familia seleccionada</h2>
+        <p className="mt-2 text-sm text-ink/60">Abrí Familias para elegir qué ramas mostrar.</p>
+        <button type="button" className="boton-secundario pointer-events-auto mt-4 text-sm" onClick={() => cambiarFamilias(new Set(familias.map(f => f.id)))}>Mostrar todas</button>
+      </div>
+    </div>}
     <div className="absolute right-4 top-4 z-10 flex overflow-hidden rounded-xl border border-border bg-white/95 shadow-soft backdrop-blur-sm sm:right-6 sm:top-6">
       <button type="button" onClick={() => modificarZoom(1.22)} className="arbol-control" aria-label="Acercar"><Plus size={18} /></button>
       <button type="button" onClick={() => modificarZoom(0.82)} className="arbol-control border-x border-border" aria-label="Alejar"><Minus size={18} /></button>
