@@ -17,18 +17,18 @@ function pathSegmentos(ss: SegmentoArbol[], red: SegmentoArbol[], protegidos: Pu
   }));
   const unir = (p: PuntoArbol) => vecinos.get(clave(p))?.length === 2
     && !protegidos.some(q => igual(p, q)) && red.filter(s => contiene(s, p)).length === 2;
-  const vistos = new Set<number>(), paths: string[] = [];
+  const vistos = new Set<number>(), paths: Array<{ d: string; tramos: SegmentoArbol[] }> = [];
   const par = (p: PuntoArbol) => `${numero(p.x)},${numero(p.y)}`;
   for (let i = 0; i < ss.length; i++) {
     if (vistos.has(i)) continue;
-    const puntos = [ss[i].inicio, ss[i].fin]; vistos.add(i);
+    const puntos = [ss[i].inicio, ss[i].fin], tramos = [ss[i]]; vistos.add(i);
     const extender = () => {
       while (unir(puntos[puntos.length - 1])) {
         const ultimo = puntos[puntos.length - 1];
         const siguiente = vecinos.get(clave(ultimo))!.find(j => !vistos.has(j));
         if (siguiente === undefined) break;
         vistos.add(siguiente);
-        const s = ss[siguiente]; puntos.push(igual(s.inicio, ultimo) ? s.fin : s.inicio);
+        const s = ss[siguiente]; tramos.push(s); puntos.push(igual(s.inicio, ultimo) ? s.fin : s.inicio);
       }
     };
     extender(); puntos.reverse(); extender();
@@ -36,7 +36,7 @@ function pathSegmentos(ss: SegmentoArbol[], red: SegmentoArbol[], protegidos: Pu
     for (let j = 1; j < puntos.length - 1; j++) {
       const a = puntos[j - 1], b = puntos[j], c = puntos[j + 1];
       const ab = Math.abs(a.x - b.x) + Math.abs(a.y - b.y), bc = Math.abs(c.x - b.x) + Math.abs(c.y - b.y);
-      const radio = Math.min(9, ab / 2, bc / 2);
+      const radio = Math.min(18, ab / 2, bc / 2);
       const entrada = { x: b.x + (a.x - b.x) / ab * radio, y: b.y + (a.y - b.y) / ab * radio };
       const salida = { x: b.x + (c.x - b.x) / bc * radio, y: b.y + (c.y - b.y) / bc * radio };
       const codo = (Math.abs(a.x - b.x) < EPS) !== (Math.abs(b.x - c.x) < EPS);
@@ -48,11 +48,11 @@ function pathSegmentos(ss: SegmentoArbol[], red: SegmentoArbol[], protegidos: Pu
       d += codo && libre ? ` L${par(entrada)} Q${par(b)} ${par(salida)}` : ` L${par(b)}`;
     }
     const fin = puntos[puntos.length - 1];
-    paths.push(puntos.length === 2
+    paths.push({ d: puntos.length === 2
       ? `${d} ${Math.abs(puntos[0].x - fin.x) < EPS ? `V${numero(fin.y)}` : `H${numero(fin.x)}`}`
-      : `${d} L${par(fin)}`);
+      : `${d} L${par(fin)}`, tramos });
   }
-  return paths.join(" ");
+  return paths;
 }
 
 export function segmentoAtraviesaTarjeta(s: SegmentoArbol, n: NodoPosicionadoArbol) {
@@ -147,7 +147,7 @@ function planificar(vinculos: VinculoVisualArbol[], nodos: NodoPosicionadoArbol[
   const bandas: number[][] = [];
   for (const y of [...new Set(nodos.map(n => n.y))].sort((a, b) => a - b)) {
     const ultima = bandas[bandas.length - 1];
-    if (ultima && y - ultima[0] <= GEOMETRIA_ARBOL.desnivelMaximo * 2) ultima.push(y);
+    if (ultima && y - ultima[0] <= GEOMETRIA_ARBOL.subnivelNumeroso) ultima.push(y);
     else bandas.push([y]);
   }
   const nivelBanda = new Map(bandas.flatMap(ys => ys.map(y => [y, ys[ys.length - 1]] as const)));
@@ -212,7 +212,12 @@ export function crearTrazosVinculosArbol(vinculos: VinculoVisualArbol[], nodosEn
       agregar("union", ruta({ x: Math.min(...ps.map(p => p.x)), y: puenteY }, { x: Math.max(...ps.map(p => p.x)), y: puenteY }, nodos));
     }
     if (hijos.length) {
-      const yBus = plan.nivel + H + 24 + cantidad * GEOMETRIA_ARBOL.separacionCarriles + plan.carril * GEOMETRIA_ARBOL.separacionCarriles;
+      const minimoBus = plan.nivel + H + 24 + cantidad * GEOMETRIA_ARBOL.separacionCarriles + plan.carril * GEOMETRIA_ARBOL.separacionCarriles;
+      // El aire adicional se reparte antes y después del distribuidor.
+      const siguienteBanda = Math.min(...hijos.map(n => n.y - H), ...nodos
+        .filter(n => n.y > plan.nivel + GEOMETRIA_ARBOL.desnivelMaximo * 2).map(n => n.y - H));
+      const disponible = siguienteBanda - (plan.nivel + H + 24 + cantidad * GEOMETRIA_ARBOL.separacionCarriles * 2);
+      const yBus = minimoBus + Math.max(0, disponible) * 0.35;
       const destino = hijos.map(n => ({ personaId: n.data.id, x: n.x, y: n.y - H }));
       puertos.push(...destino);
       // El ancla SIEMPRE forma parte del intervalo del bus, aun si todos los
@@ -230,8 +235,36 @@ export function crearTrazosVinculosArbol(vinculos: VinculoVisualArbol[], nodosEn
     });
     const finales = [...unicos.values()];
     const dibujar = (tramos: SegmentoArbol[]) => pathSegmentos(tramos, finales, [...puertos, ancla], nodos);
-    const partes = (["hermanos", "descendencia", "union"] as const)
-      .map(papel => ({ papel, d: dibujar(finales.filter(s => s.papel === papel)) })).filter(p => p.d.length > 0);
+    // Se encadenan los codos también entre el bus y sus bajadas: separarlos
+    // por papel impedía redondear precisamente los extremos más visibles.
+    const destinos = puertos.filter(p => hijos.some(h => h.data.id === p.personaId));
+    const partes: TrazoVinculoArbol["partes"] = [
+      ...dibujar(finales.filter(s => s.papel !== "union")).map(({ d, tramos }) => {
+        const terminal = destinos.some(p => tramos.some(s => igual(s.inicio, p) || igual(s.fin, p)));
+        const bus = tramos.some(s => s.papel === "hermanos");
+        // En las bifurcaciones interiores, la bajada nace tangente al bus.
+        // El punto de unión sigue sobre la misma rama; el puerto no se mueve.
+        if (terminal && !bus && tramos.length === 1) {
+          const s = tramos[0], fin = destinos.find(p => igual(s.inicio, p) || igual(s.fin, p));
+          const inicio = fin && (igual(s.inicio, fin) ? s.fin : s.inicio);
+          const horizontal = inicio && finales.find(r => r.papel === "hermanos" && contiene(r, inicio)
+            && Math.abs(r.inicio.y - r.fin.y) < EPS);
+          if (fin && inicio && horizontal && Math.abs(inicio.x - fin.x) < EPS && fin.y > inicio.y) {
+            const signo = inicio.x < ancla.x ? 1 : -1;
+            const disponible = signo > 0 ? Math.max(horizontal.inicio.x, horizontal.fin.x) - inicio.x
+              : inicio.x - Math.min(horizontal.inicio.x, horizontal.fin.x);
+            const r = Math.min(18, disponible / 2, (fin.y - inicio.y) / 2);
+            const x = inicio.x + signo * r;
+            const libre = !nodos.some(n => Math.max(x, inicio.x) > n.x - W && Math.min(x, inicio.x) < n.x + W
+              && inicio.y + r > n.y - H && inicio.y < n.y + H);
+            if (r > EPS && libre) d = `M${numero(x)},${numero(inicio.y)} Q${numero(inicio.x)},${numero(inicio.y)} ${numero(inicio.x)},${numero(inicio.y + r)} V${numero(fin.y)}`;
+          }
+        }
+        return { d, papel: bus ? "hermanos" as const : "descendencia" as const,
+          jerarquia: bus ? "rama" as const : terminal ? "terminal" as const : "tronco" as const };
+      }),
+      ...dibujar(finales.filter(s => s.papel === "union")).map(({ d }) => ({ d, papel: "union" as const })),
+    ];
     resultados.set(vinculo.id, {
       d: partes.map(p => p.d).join(" "),
       modo: vinculo.tipo === "union-familiar" ? "bus" : "curva", degradado: false,

@@ -311,6 +311,28 @@ test("familias en subniveles próximos comparten carriles separados y conservan 
     "los pequeños desniveles no deben superponer los recorridos horizontales");
 });
 
+for (const cantidad of [4, 8, 10, 11]) test(`${cantidad} hermanos: plegado acotado con puertos libres y generaciones distinguibles`, () => {
+  const ps = [persona("raiz"), ...Array.from({ length: cantidad }, (_, i) => persona(`h${i}`, { padres: ["raiz"] }))];
+  const r = comprobarArbol(ps), hs = r.layout.nodos.filter(n => n.id !== "raiz");
+  const ys = [...new Set(hs.map(n => n.y))].sort((a, b) => a - b);
+  assert.equal(ys.length, cantidad >= 8 ? 2 : 1);
+  if (cantidad >= 8) {
+    assert.equal(ys[1] - ys[0], GEOMETRIA_ARBOL.subnivelNumeroso);
+    assert.ok(Math.max(...hs.map(n => n.x)) - Math.min(...hs.map(n => n.x)) + 176 < cantidad * 216 * 0.8);
+    assert.equal(new Set(hs.map(n => n.generacion)).size, 1);
+    assert.ok(ys[0] - r.layout.posiciones.get("raiz").y >= GEOMETRIA_ARBOL.separacionVertical);
+  }
+  assert.deepEqual(calcularLayoutArbol(crearModeloArbol([...ps].reverse())).nodos, r.layout.nodos);
+});
+
+test("las bifurcaciones interiores se curvan y distinguen tronco, rama y terminación", () => {
+  const ps = [persona("p"), ...["a", "b", "c"].map(id => persona(id, { padres: ["p"] }))];
+  const r = comprobarArbol(ps), partes = r.trazos.flatMap(t => t.trazo.partes);
+  assert.ok(partes.some(p => p.jerarquia === "tronco"));
+  assert.ok(partes.some(p => p.jerarquia === "rama" && p.d.includes(" Q")));
+  assert.ok(partes.some(p => p.jerarquia === "terminal" && p.d.includes(" Q")));
+});
+
 test("una madre aún no registrada no separa a los hermanos de generación", () => {
   const ps=JSON.parse(readFileSync(resolve(raiz, "Referencias/revision-layout/personas-actuales.json"),"utf8"));
   const r=comprobarArbol(ps), juan=ps.find(p=>p.nombre==="Juan Valentín"&&p.apellido==="Biani");
@@ -366,11 +388,16 @@ test("revisión final: Remigio y Esther se distinguen sin desplazar sus fichas n
   const r = comprobarArbol(ps), antes = structuredClone(r.layout.nodos);
   const remigio = ps.find(p=>p.nombre==="Remigio Lorenzo"), esther=ps.find(p=>p.nombre==="Esther Iris");
   const bruno = ps.find(p => p.nombre === "Bruno" && p.apellido === "Podrecca");
+  const numerosa = [...r.modelo.familias].sort((a, b) => b.hijos.length - a.hijos.length)[0];
+  const hermanosNumerosos = numerosa.hijos.map(id => r.layout.posiciones.get(id));
+  assert.equal(new Set(hermanosNumerosos.map(n => n.y)).size, 2,
+    "la familia más numerosa debe plegarse incluso con su pareja conectora en el extremo derecho");
+  assert.ok(Math.max(...hermanosNumerosos.map(n => n.x)) - Math.min(...hermanosNumerosos.map(n => n.x)) + 176 <= 1800);
   assert.ok(Math.abs(r.layout.posiciones.get(esther.id).x - r.layout.posiciones.get(bruno.id).x) <= 600,
     "el matrimonio no debe dejar al hermano al otro lado de una familia numerosa (antes: 2632 px)");
   for (const generacion of new Set(r.layout.nodos.map(n => n.generacion))) {
     const ys = r.layout.nodos.filter(n => n.generacion === generacion).map(n => n.y);
-    assert.ok(Math.max(...ys) - Math.min(...ys) <= GEOMETRIA_ARBOL.desnivelMaximo * 2);
+    assert.ok(Math.max(...ys) - Math.min(...ys) <= GEOMETRIA_ARBOL.subnivelNumeroso);
   }
   const marcos = crearMarcosParejaArbol(r.modelo,r.layout), marco = marcos.find(m=>m.personasIds.includes(remigio.id));
   assert.ok(marco.ramaNumerosa);
@@ -514,7 +541,8 @@ test("una unión conserva un bus sólido aunque otras tarjetas separen visualmen
 
   assert.equal(resultado?.modo, "bus");
   assert.equal(resultado?.degradado, false);
-  assert.equal(resultado?.d.includes(" H"), true, "la filiación debe mantener una barra común continua");
+  assert.ok(resultado?.segmentos.some(s => s.papel === "hermanos" && s.inicio.y === s.fin.y
+    && Math.abs(s.inicio.x - s.fin.x) >= 432), "la filiación debe mantener una barra común continua aunque sus codos sean curvas");
   assert.equal(resultado?.d.includes(" C"), false, "no debe convertir relaciones confirmadas en curvas degradadas");
 });
 

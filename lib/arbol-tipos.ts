@@ -1,9 +1,10 @@
 import type { PersonaArbol } from "./supabase/types";
 export const GEOMETRIA_ARBOL = {
-  anchoNodo: 176, altoNodo: 92, separacionVertical: 200,
+  anchoNodo: 176, altoNodo: 92, separacionVertical: 240,
   separacionPareja: 20, separacionEntreHermanos: 40,
   separacionUnidadesFamiliares: 80, separacionComponentes: 240,
-  margenMapa: 72, separacionCarriles: 16, desnivelMaximo: 20,
+  margenMapa: 72, separacionCarriles: 18, desnivelMaximo: 20,
+  subnivelNumeroso: 124, umbralNumeroso: 8,
 } as const;
 export interface FamiliaArbol {
   id: string;
@@ -97,7 +98,7 @@ export interface TrazoVinculoArbol {
   segmentos: SegmentoArbol[];
   puertos: PuertoArbol[];
   ancla: PuntoArbol;
-  partes: Array<{ papel: PapelSegmentoArbol; d: string }>;
+  partes: Array<{ papel: PapelSegmentoArbol; d: string; jerarquia?: "tronco" | "rama" | "terminal" }>;
 }
 
 export interface DiagnosticoVinculosVisualesArbol {

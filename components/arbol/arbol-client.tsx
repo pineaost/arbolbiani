@@ -254,8 +254,8 @@ function MapaArbol({ personas: personasCompletas, modeloArbol: modeloCompleto }:
                 data-vinculo-tipo={vinculo.tipo}
                 data-vinculo-modo={trazo.modo}
               >
-                {trazo.partes.map(parte => <path key={parte.papel}
-                  className={`arbol-vinculo-normalizado arbol-vinculo-${vinculo.tipo} arbol-tramo-${parte.papel}`}
+                {trazo.partes.map((parte, indice) => <path key={`${parte.papel}-${indice}`}
+                  className={`arbol-vinculo-normalizado arbol-vinculo-${vinculo.tipo} arbol-tramo-${parte.papel}${parte.jerarquia ? ` arbol-rama-${parte.jerarquia}` : ""}`}
                   d={parte.d}
                 />)}
                 {esPareja && <circle className="arbol-punto-union" cx={trazo.ancla.x} cy={trazo.ancla.y} r={2.6} />}

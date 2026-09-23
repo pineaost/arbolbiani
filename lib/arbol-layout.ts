@@ -2,6 +2,8 @@ import type { ModeloArbol, LayoutArbol, PosicionPersonaArbol } from "./arbol-tip
 import { GEOMETRIA_ARBOL } from "./arbol-tipos";
 import { claveOrden, crearVinculosVisualesArbol } from "./arbol-modelo";
 import { espacioEntreFilasArbol, crearTrazosVinculosArbol, diagnosticarGeometriaArbol } from "./arbol-vinculos";
+import { getFamiliaPrincipal } from "./familias";
+import { compactarBandasNumerosas } from "./arbol-bandas";
 
 class Grupos {
   private representantes = new Map<string, string>();
@@ -174,7 +176,23 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
   // referente del bloque. Deduplicar evita pesar dos veces hermanos completos.
   const hermandades = [...new Map([...modelo.hijosPorPadre.values()]
     .filter(hs => hs.size > 1).map(hs => { const hsOrdenados = [...hs].sort(); return [hsOrdenados.join(":"), hsOrdenados] as const; })).values()];
-  const gap = (a: Bloque, b: Bloque) => a.familia === b.familia ? GEOMETRIA_ARBOL.separacionEntreHermanos : GEOMETRIA_ARBOL.separacionUnidadesFamiliares;
+  const familiasBloque = new Map(bloques.map(b => [b.id, new Set(b.personas
+    .map(id => getFamiliaPrincipal(modelo.personas.get(id)!)).filter((id): id is NonNullable<typeof id> => id !== null))]));
+  const anchosPorBanda = new Map<string, number>();
+  for (const b of bloques) for (const familia of familiasBloque.get(b.id)!) {
+    const clave = `${familia}:${b.generacion}`;
+    anchosPorBanda.set(clave, (anchosPorBanda.get(clave) ?? 0) + b.ancho + GEOMETRIA_ARBOL.separacionEntreHermanos);
+  }
+  const reserva = (b: Bloque) => Math.max(0, ...[...familiasBloque.get(b.id)!]
+    .map(f => Math.min(72, Math.max(0, (anchosPorBanda.get(`${f}:${b.generacion}`) ?? 0) - 1200) * 0.04)));
+  const gap = (a: Bloque, b: Bloque) => {
+    if (a.familia === b.familia) return GEOMETRIA_ARBOL.separacionEntreHermanos;
+    const fa = familiasBloque.get(a.id)!, fb = familiasBloque.get(b.id)!;
+    // La envolvente de la banda determina el corredor entre familias. Los
+    // matrimonios puente comparten etiquetas y conservan la separación normal.
+    const distintas = fa.size && fb.size && ![...fa].some(f => fb.has(f));
+    return GEOMETRIA_ARBOL.separacionUnidadesFamiliares + (distintas ? Math.max(reserva(a), reserva(b)) : 0);
+  };
   let cursor = 0;
   const posicionesBase: PosicionPersonaArbol[] = [];
   modelo.componentes.forEach((componente, componenteIndice) => {
@@ -412,7 +430,8 @@ export function calcularLayoutArbol(modelo: ModeloArbol): LayoutArbol {
     const valor = puntuar(candidato);
     if(menor(valor, costo)) { mejor=candidato; costo=valor; }
   }
-  return flexibilizarBandas(modelo, mejor);
+  const compacto = compactarBandasNumerosas(modelo, mejor);
+  return compacto === mejor ? flexibilizarBandas(modelo, mejor) : compacto;
 }
 
 /** Sólo admite un subnivel cuando elimina contactos entre vínculos sin crear
