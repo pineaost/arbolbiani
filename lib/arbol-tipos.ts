@@ -1,9 +1,9 @@
 import type { PersonaArbol } from "./supabase/types";
 export const GEOMETRIA_ARBOL = {
-  anchoNodo: 176, altoNodo: 92, separacionVertical: 172,
+  anchoNodo: 176, altoNodo: 92, separacionVertical: 200,
   separacionPareja: 20, separacionEntreHermanos: 40,
   separacionUnidadesFamiliares: 80, separacionComponentes: 240,
-  margenMapa: 72, separacionCarriles: 12,
+  margenMapa: 72, separacionCarriles: 16, desnivelMaximo: 20,
 } as const;
 export interface FamiliaArbol {
   id: string;

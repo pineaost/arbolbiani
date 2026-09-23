@@ -218,7 +218,7 @@ function MapaArbol({ personas: personasCompletas, modeloArbol: modeloCompleto }:
     <div
       className={`arbol-mapa arbol-mapa-propio arbol-zoom-${detalleZoom}`}
       ref={contenedorRef}
-      style={{ ...variablesGeometriaArbol, "--arbol-grosor-vinculo": `${Math.max(1.6, 0.75 / vista.escala)}px` } as CSSProperties}
+      style={{ ...variablesGeometriaArbol, "--arbol-grosor-vinculo": `${Math.max(1.9, 0.85 / vista.escala)}px` } as CSSProperties}
       aria-label="Mapa interactivo del árbol genealógico"
       onPointerDown={iniciarArrastre}
       onPointerMove={arrastrar}

@@ -63,16 +63,18 @@ body { @apply bg-background text-ink font-body antialiased; }
 .arbol-escena { position: absolute; inset: 0 auto auto 0; transform-origin: 0 0; will-change: transform; }
 .arbol-vinculos { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 
-.arbol-mapa path.arbol-vinculo-normalizado { fill: none; stroke: rgb(var(--sakura-vinculo)); stroke-width: var(--arbol-grosor-vinculo, 1.6px); stroke-linecap: round; stroke-linejoin: round; opacity: 0.76; transition: stroke 200ms ease; }
-.arbol-mapa path.arbol-tramo-hermanos { opacity: 0.66; }
-.arbol-mapa path.arbol-tramo-descendencia { stroke-width: calc(var(--arbol-grosor-vinculo, 1.6px) * 1.05); }
-.arbol-mapa path.arbol-tramo-union { stroke: rgb(var(--sakura-plum)); stroke-width: calc(var(--arbol-grosor-vinculo, 1.6px) * 1.2); opacity: 0.9; }
+.arbol-mapa path.arbol-vinculo-normalizado { fill: none; stroke: rgb(var(--sakura-vinculo)); stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * var(--arbol-factor-activo, 1)); stroke-linecap: round; stroke-linejoin: round; opacity: 0.82; transition: stroke 200ms ease, stroke-width 200ms ease, opacity 200ms ease; }
+.arbol-mapa path.arbol-tramo-hermanos { opacity: 0.74; }
+.arbol-mapa path.arbol-tramo-descendencia { stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * 1.05 * var(--arbol-factor-activo, 1)); }
+.arbol-mapa path.arbol-tramo-union { stroke: rgb(var(--sakura-plum)); stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * 1.2 * var(--arbol-factor-activo, 1)); opacity: 0.9; }
 .arbol-punto-union { fill: rgb(var(--sakura-plum)); opacity: 0.85; }
 .arbol-marco-pareja { fill: rgb(var(--sakura-lavender) / 0.25); stroke: rgb(var(--sakura-plum) / 0.14); stroke-width: 1px; }
 .arbol-marco-pareja-rama-numerosa { fill: rgb(var(--sakura-lavender) / 0.5); stroke: rgb(var(--sakura-plum) / 0.3); }
 .arbol-marco-pareja-seleccionada { fill: rgb(var(--sakura-lavender) / 0.65); stroke: rgb(var(--sakura-plum) / 0.55); }
-.arbol-vinculo-contexto { opacity: 0.3; }
-.arbol-vinculo-destacado path.arbol-vinculo-normalizado { opacity: 1; stroke: rgb(var(--sakura-plum)); }
+.links_view > g { transition: opacity 200ms ease; }
+.arbol-vinculo-contexto { opacity: 0.18; }
+.arbol-vinculo-destacado { --arbol-factor-activo: 1.25; }
+.arbol-mapa .arbol-vinculo-destacado path.arbol-vinculo-normalizado { opacity: 1; }
 
 .arbol-nodo {
   display: flex; width: var(--arbol-nodo-ancho); min-height: var(--arbol-nodo-alto); cursor: pointer;

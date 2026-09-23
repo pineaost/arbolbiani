@@ -254,19 +254,24 @@ test("la cronología de hermanos no depende del género ni de la edad de su pare
   assert.deepEqual(otra.nodos,r.layout.nodos);
 });
 
-test("once hermanos sin fechas se reordenan por las ascendencias externas manteniendo parejas y generación", () => {
-  const ps = [persona("padre"), persona("madre"), ...Array.from({ length: 11 }, (_, i) =>
+for (const cantidad of [8, 10, 11]) test(`${cantidad} hermanos sin fechas equilibran ambas ascendencias manteniendo parejas y generación`, () => {
+  const ps = [persona("padre"), persona("madre"), ...Array.from({ length: cantidad }, (_, i) =>
     persona(`h${String(i).padStart(2, "0")}`, { padres: ["padre", "madre"], nacimiento: null,
       conyuges: i === 3 ? ["pareja-a"] : i === 7 ? ["pareja-b"] : [] })),
     persona("raiz-a"), persona("raiz-b"), persona("pareja-a", { padres: ["raiz-a"] }), persona("pareja-b", { padres: ["raiz-b"] })];
   const { layout, geometria } = comprobarArbol(ps);
   const hermanos = layout.nodos.filter(n => n.id.startsWith("h")).sort((a, b) => a.x - b.x);
   assert.equal(new Set(hermanos.map(n => n.generacion)).size, 1);
-  assert.equal(new Set(hermanos.map(n => n.y)).size, 1);
-  assert.ok(hermanos.findIndex(n => n.id === "h03") >= 8 && hermanos.findIndex(n => n.id === "h07") >= 8,
-    "ambos matrimonios deben acercarse al borde de las ascendencias externas, aunque antes estuvieran en el medio");
+  assert.ok(Math.max(...hermanos.map(n => n.y)) - Math.min(...hermanos.map(n => n.y)) <= GEOMETRIA_ARBOL.desnivelMaximo * 2);
+  // Cada matrimonio puede mirar a un extremo distinto. Exigir que ambos estén
+  // a la derecha descartaba una solución sin cruces con ascendencias a ambos lados.
+  for (const [h, raiz] of [["h03", "raiz-a"], ["h07", "raiz-b"]]) {
+    const indice = hermanos.findIndex(n => n.id === h);
+    const centro = (hermanos[0].x + hermanos[hermanos.length - 1].x) / 2;
+    assert.ok(layout.posiciones.get(raiz).x < centro ? indice <= 2 : indice >= cantidad - 3);
+  }
   for (const [h, p] of [["h03", "pareja-a"], ["h07", "pareja-b"]]) {
-    assert.equal(Math.abs(layout.posiciones.get(h).x - layout.posiciones.get(p).x), 196);
+    assert.ok(Math.abs(Math.abs(layout.posiciones.get(h).x - layout.posiciones.get(p).x) - 196) < 0.001);
   }
   assert.ok(geometria.cruces <= 1);
   assert.deepEqual(calcularLayoutArbol(crearModeloArbol([...ps].reverse())).nodos, layout.nodos);
@@ -287,6 +292,23 @@ test("los codos suaves conservan puertos y bifurcaciones exactos y no entran en 
       assert.ok(nodos.every(n => Math.abs(n.x-x) >= 88-0.001 || Math.abs(n.y-y) >= 46-0.001));
     }
   }
+});
+
+test("familias en subniveles próximos comparten carriles separados y conservan el tronco común", () => {
+  const nodos = [
+    { data: { id: "p" }, x: 0, y: 0 }, { data: { id: "q" }, x: 600, y: 20 },
+    { data: { id: "a" }, x: 1000, y: 240 }, { data: { id: "b" }, x: 1200, y: 240 },
+    { data: { id: "c" }, x: -600, y: 240 }, { data: { id: "d" }, x: -400, y: 240 },
+  ];
+  const vinculos = [["p", "a", "b"], ["q", "c", "d"]].map(([p, ...hijos]) => ({
+    id: p, familiaId: p, tipo: "union-familiar", progenitoresIds: [p], hijosIds: hijos,
+  }));
+  const trazos = crearTrazosVinculosArbol(vinculos, nodos);
+  comprobarGeometria(trazos, nodos);
+  const buses = trazos.map(({ trazo }) => trazo.segmentos.filter(s => s.papel === "hermanos"));
+  assert.ok(buses.every(ss => ss.length === 1), "cada familia conserva un distribuidor compartido");
+  assert.ok(Math.abs(buses[0][0].inicio.y - buses[1][0].inicio.y) >= 16,
+    "los pequeños desniveles no deben superponer los recorridos horizontales");
 });
 
 test("una madre aún no registrada no separa a los hermanos de generación", () => {
@@ -343,6 +365,13 @@ test("revisión final: Remigio y Esther se distinguen sin desplazar sus fichas n
   const ps = JSON.parse(readFileSync(resolve(raiz,"Referencias/revision-layout/personas-revision-final.json"),"utf8"));
   const r = comprobarArbol(ps), antes = structuredClone(r.layout.nodos);
   const remigio = ps.find(p=>p.nombre==="Remigio Lorenzo"), esther=ps.find(p=>p.nombre==="Esther Iris");
+  const bruno = ps.find(p => p.nombre === "Bruno" && p.apellido === "Podrecca");
+  assert.ok(Math.abs(r.layout.posiciones.get(esther.id).x - r.layout.posiciones.get(bruno.id).x) <= 600,
+    "el matrimonio no debe dejar al hermano al otro lado de una familia numerosa (antes: 2632 px)");
+  for (const generacion of new Set(r.layout.nodos.map(n => n.generacion))) {
+    const ys = r.layout.nodos.filter(n => n.generacion === generacion).map(n => n.y);
+    assert.ok(Math.max(...ys) - Math.min(...ys) <= GEOMETRIA_ARBOL.desnivelMaximo * 2);
+  }
   const marcos = crearMarcosParejaArbol(r.modelo,r.layout), marco = marcos.find(m=>m.personasIds.includes(remigio.id));
   assert.ok(marco.ramaNumerosa);
   assert.deepEqual(new Set(marco.personasIds),new Set([remigio.id,esther.id]));

@@ -36,7 +36,7 @@ function pathSegmentos(ss: SegmentoArbol[], red: SegmentoArbol[], protegidos: Pu
     for (let j = 1; j < puntos.length - 1; j++) {
       const a = puntos[j - 1], b = puntos[j], c = puntos[j + 1];
       const ab = Math.abs(a.x - b.x) + Math.abs(a.y - b.y), bc = Math.abs(c.x - b.x) + Math.abs(c.y - b.y);
-      const radio = Math.min(4, ab / 2, bc / 2);
+      const radio = Math.min(9, ab / 2, bc / 2);
       const entrada = { x: b.x + (a.x - b.x) / ab * radio, y: b.y + (a.y - b.y) / ab * radio };
       const salida = { x: b.x + (c.x - b.x) / bc * radio, y: b.y + (c.y - b.y) / bc * radio };
       const codo = (Math.abs(a.x - b.x) < EPS) !== (Math.abs(b.x - c.x) < EPS);
@@ -142,6 +142,15 @@ interface PlanUnion {
 
 function planificar(vinculos: VinculoVisualArbol[], nodos: NodoPosicionadoArbol[]) {
   const porId = new Map(nodos.map(n => [n.data.id, n]));
+  // Los subniveles de una banda comparten la misma reserva de carriles. Así
+  // mover una pareja 20 px no crea buses casi coincidentes de familias distintas.
+  const bandas: number[][] = [];
+  for (const y of [...new Set(nodos.map(n => n.y))].sort((a, b) => a - b)) {
+    const ultima = bandas[bandas.length - 1];
+    if (ultima && y - ultima[0] <= GEOMETRIA_ARBOL.desnivelMaximo * 2) ultima.push(y);
+    else bandas.push([y]);
+  }
+  const nivelBanda = new Map(bandas.flatMap(ys => ys.map(y => [y, ys[ys.length - 1]] as const)));
   const planes: PlanUnion[] = [];
   for (const vinculo of [...vinculos].sort((a, b) => a.id.localeCompare(b.id))) {
     const padresIds = vinculo.tipo === "conyugal" ? [vinculo.origenId, vinculo.destinoId] : vinculo.progenitoresIds;
@@ -152,7 +161,7 @@ function planificar(vinculos: VinculoVisualArbol[], nodos: NodoPosicionadoArbol[
     if ([...ps, ...hs].some(n => !Number.isFinite(n.x) || !Number.isFinite(n.y))) continue;
     const directa = ps.length === 2 && Math.abs(ps[0].y - ps[1].y) < EPS && !nodos.some(n => !padresIds.includes(n.data.id)
       && segmentoAtraviesaTarjeta({ inicio: { x: ps[0].x + W, y: ps[0].y }, fin: { x: ps[1].x - W, y: ps[1].y } }, n));
-    planes.push({ vinculo, padres: ps, hijos: hs, directa, nivel: Math.max(...ps.map(p => p.y)), minX: Math.min(...[...ps, ...hs].map(p => p.x)), maxX: Math.max(...[...ps, ...hs].map(p => p.x)), carril: 0 });
+    planes.push({ vinculo, padres: ps, hijos: hs, directa, nivel: Math.max(...ps.map(p => nivelBanda.get(p.y)!)), minX: Math.min(...[...ps, ...hs].map(p => p.x)), maxX: Math.max(...[...ps, ...hs].map(p => p.x)), carril: 0 });
   }
   // Coloración de intervalos: familias cuyo recorrido horizontal coincide
   // reciben carriles diferentes. El mismo plan determina el espacio vertical.
