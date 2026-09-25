@@ -88,7 +88,7 @@ body { @apply bg-background text-ink font-body antialiased; }
   border-radius: 14px; background: rgb(var(--sakura-paper)); padding: 11px 13px;
   box-shadow: var(--sakura-shadow-card), 0 0 0 1px rgb(var(--halo) / 0.14), 0 10px 20px -15px rgb(var(--halo) / 0.42);
   color: rgb(var(--sakura-ink));
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease, padding 180ms ease, border-radius 180ms ease;
 }
 .arbol-nodo-propio { position: absolute; height: var(--arbol-nodo-alto); margin: 0; appearance: none; text-align: left; user-select: none; }
 .arbol-mapa .arbol-nodo-femenino { --halo: var(--sakura-femenino); border-left-color: rgb(var(--sakura-femenino)); }
@@ -102,11 +102,21 @@ body { @apply bg-background text-ink font-body antialiased; }
   white-space: normal; overflow-wrap: normal; word-break: normal; hyphens: none;
   font-family: var(--font-display), system-ui, sans-serif; font-size: 15px; font-weight: 700; line-height: 1.24;
   color: rgb(var(--sakura-plum));
+  opacity: var(--arbol-opacidad-nombre, 1); transition: opacity 180ms ease;
 }
-.arbol-nodo-anios { margin-top: 4px; font-size: 12px; line-height: 1.15; color: rgb(var(--sakura-muted)); }
-.arbol-zoom-lejos .arbol-nodo { min-height: 42px; padding: 7px 9px; border-left-width: 3px; border-radius: 9px; }
-.arbol-zoom-lejos .arbol-nodo-nombre, .arbol-zoom-lejos .arbol-nodo-anios { display: none; }
-.arbol-zoom-lejos .arbol-nodo::after { content: "•"; color: rgb(var(--sakura-plum)); font-size: 18px; line-height: 1; text-align: center; }
+.arbol-nodo-anios {
+  margin-top: calc(4px * var(--arbol-opacidad-anios, 1));
+  max-height: calc(20px * var(--arbol-opacidad-anios, 1)); overflow: hidden;
+  font-size: 12px; line-height: 1.15; color: rgb(var(--sakura-muted));
+  opacity: var(--arbol-opacidad-anios, 1);
+  transition: opacity 180ms ease, max-height 180ms ease, margin-top 180ms ease;
+}
+.arbol-zoom-medio .arbol-nodo, .arbol-zoom-lejos .arbol-nodo, .arbol-zoom-extremo .arbol-nodo { padding: 7px 9px; border-radius: 9px; }
+.arbol-nodo-propio::after {
+  content: "•"; position: absolute; inset: 0; display: grid; place-items: center;
+  color: rgb(var(--sakura-plum)); font-size: 18px; line-height: 1;
+  opacity: var(--arbol-opacidad-punto, 0); transition: opacity 180ms ease; pointer-events: none;
+}
 
 .arbol-control { display: inline-flex; min-height: 40px; min-width: 40px; align-items: center; justify-content: center; color: rgb(var(--sakura-muted)); transition: background-color 150ms ease, color 150ms ease; }
 .arbol-control:hover, .arbol-control:focus-visible { background: rgb(var(--sakura-petal)); color: rgb(var(--sakura-plum)); outline: none; }

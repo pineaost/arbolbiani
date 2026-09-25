@@ -70,7 +70,11 @@ function MapaArbol({ personas: personasCompletas, modeloArbol: modeloCompleto }:
   const unidadSeleccionada = useMemo(() => new Set(personaSeleccionadaId
     ? [personaSeleccionadaId, ...modeloArbol.conyugesPorPersona.get(personaSeleccionadaId) ?? []]
     : []), [personaSeleccionadaId, modeloArbol]);
-  const detalleZoom = vista.escala < 0.53 ? "lejos" : vista.escala < 0.9 ? "medio" : "cerca";
+  const detalleZoom = vista.escala < 0.08 ? "extremo" : vista.escala < 0.22 ? "lejos" : vista.escala < 0.65 ? "medio" : "cerca";
+  // Primero se retiran las fechas; el nombre sólo se desvanece entre 8% y 4%.
+  // La ficha y su área interactiva conservan las dimensiones del layout.
+  const opacidadAnios = limitar((vista.escala - 0.45) / 0.2, 0, 1);
+  const opacidadNombre = limitar((vista.escala - 0.04) / 0.04, 0, 1);
 
   const cambiarFamilias = (activas: Set<string>) => {
     setFamiliasOcultas(new Set(familias.filter(f => !activas.has(f.id)).map(f => f.id)));
@@ -218,7 +222,12 @@ function MapaArbol({ personas: personasCompletas, modeloArbol: modeloCompleto }:
     <div
       className={`arbol-mapa arbol-mapa-propio arbol-zoom-${detalleZoom}`}
       ref={contenedorRef}
-      style={{ ...variablesGeometriaArbol, "--arbol-grosor-vinculo": `${Math.max(1.9, 0.85 / vista.escala)}px` } as CSSProperties}
+      style={{ ...variablesGeometriaArbol,
+        "--arbol-grosor-vinculo": `${Math.max(1.9, 0.85 / vista.escala)}px`,
+        "--arbol-opacidad-anios": opacidadAnios,
+        "--arbol-opacidad-nombre": opacidadNombre,
+        "--arbol-opacidad-punto": 1 - opacidadNombre,
+      } as CSSProperties}
       aria-label="Mapa interactivo del árbol genealógico"
       onPointerDown={iniciarArrastre}
       onPointerMove={arrastrar}
