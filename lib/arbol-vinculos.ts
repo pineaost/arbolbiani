@@ -36,7 +36,7 @@ function pathSegmentos(ss: SegmentoArbol[], red: SegmentoArbol[], protegidos: Pu
     for (let j = 1; j < puntos.length - 1; j++) {
       const a = puntos[j - 1], b = puntos[j], c = puntos[j + 1];
       const ab = Math.abs(a.x - b.x) + Math.abs(a.y - b.y), bc = Math.abs(c.x - b.x) + Math.abs(c.y - b.y);
-      const radio = Math.min(18, ab / 2, bc / 2);
+      const radio = Math.min(26, ab * 0.4, bc * 0.4);
       const entrada = { x: b.x + (a.x - b.x) / ab * radio, y: b.y + (a.y - b.y) / ab * radio };
       const salida = { x: b.x + (c.x - b.x) / bc * radio, y: b.y + (c.y - b.y) / bc * radio };
       const codo = (Math.abs(a.x - b.x) < EPS) !== (Math.abs(b.x - c.x) < EPS);
@@ -253,7 +253,7 @@ export function crearTrazosVinculosArbol(vinculos: VinculoVisualArbol[], nodosEn
             const signo = inicio.x < ancla.x ? 1 : -1;
             const disponible = signo > 0 ? Math.max(horizontal.inicio.x, horizontal.fin.x) - inicio.x
               : inicio.x - Math.min(horizontal.inicio.x, horizontal.fin.x);
-            const r = Math.min(18, disponible / 2, (fin.y - inicio.y) / 2);
+            const r = Math.min(24, disponible * 0.4, (fin.y - inicio.y) * 0.4);
             const x = inicio.x + signo * r;
             const libre = !nodos.some(n => Math.max(x, inicio.x) > n.x - W && Math.min(x, inicio.x) < n.x + W
               && inicio.y + r > n.y - H && inicio.y < n.y + H);

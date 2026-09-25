@@ -67,9 +67,9 @@ body { @apply bg-background text-ink font-body antialiased; }
 .arbol-mapa path.arbol-tramo-hermanos { opacity: 0.74; }
 .arbol-mapa path.arbol-tramo-descendencia { stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * 1.05 * var(--arbol-factor-activo, 1)); }
 .arbol-mapa path.arbol-tramo-union { stroke: rgb(var(--sakura-plum)); stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * 1.2 * var(--arbol-factor-activo, 1)); opacity: 0.9; }
-.arbol-mapa path.arbol-rama-tronco { stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * 1.22 * var(--arbol-factor-activo, 1)); }
+.arbol-mapa path.arbol-rama-tronco { stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * 1.25 * var(--arbol-factor-activo, 1)); }
 .arbol-mapa path.arbol-rama-rama { stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * 1.06 * var(--arbol-factor-activo, 1)); }
-.arbol-mapa path.arbol-rama-terminal { stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * 0.9 * var(--arbol-factor-activo, 1)); }
+.arbol-mapa path.arbol-rama-terminal { stroke-width: calc(var(--arbol-grosor-vinculo, 1.9px) * 0.92 * var(--arbol-factor-activo, 1)); }
 .arbol-punto-union { fill: rgb(var(--sakura-plum)); opacity: 0.85; }
 .arbol-marco-pareja { fill: rgb(var(--sakura-lavender) / 0.25); stroke: rgb(var(--sakura-plum) / 0.14); stroke-width: 1px; }
 .arbol-marco-pareja-rama-numerosa { fill: rgb(var(--sakura-lavender) / 0.5); stroke: rgb(var(--sakura-plum) / 0.3); }

@@ -25,16 +25,22 @@ export function compactarBandasNumerosas(modelo: ModeloArbol, original: LayoutAr
     const izquierda = Math.min(...bs.flatMap(ns => ns.map(n => n.x))) - G.anchoNodo / 2;
     const derecha = Math.max(...bs.flatMap(ns => ns.map(n => n.x))) + G.anchoNodo / 2;
     if (nodos.some(n => n.generacion === generacion && !propios.has(n.id) && n.x > izquierda && n.x < derecha)) continue;
-    const hojas = bs.filter(ns => ns.length === 1 && !(modelo.hijosPorPadre.get(ns[0].id)?.size));
+    const hojas = bs.filter(ns => ns.length === 1 && !(modelo.hijosPorPadre.get(ns[0].id)?.size)
+      && !(modelo.conyugesPorPersona.get(ns[0].id)?.size));
     const conectores = bs.filter(ns => !hojas.includes(ns));
     // Dos conectores en lados distintos fijan dos fronteras: plegar esa tanda
     // arrastraría otra ascendencia. En ese caso se conserva el layout anterior.
     if (conectores.length > 1) continue;
-    const cantidadAbajo = Math.min(Math.floor(bs.length / 2), hojas.length);
+    const cantidadAbajo = Math.min(Math.ceil(bs.length * 0.4), Math.floor((bs.length - 1) / 2), hojas.length);
     if (cantidadAbajo < 3) continue;
-    // Alternancia estable, conservando en los bordes los bloques conectores.
-    const abajo = hojas.filter((_, i) => i % 2 === 1).slice(0, cantidadAbajo);
-    for (const hoja of hojas) if (abajo.length < cantidadAbajo && !abajo.includes(hoja)) abajo.push(hoja);
+    // Un tramo continuo de hojas, lejos del conector: la mayoría conserva
+    // la línea principal y ninguna pareja ni rama descendente cambia de altura.
+    const opciones = bs.map((_, i) => bs.slice(i, i + cantidadAbajo))
+      .filter(ns => ns.length === cantidadAbajo && ns.every(n => hojas.includes(n)));
+    const conectorX = conectores[0]?.[0].x ?? derecha;
+    opciones.sort((a, b) => Math.abs(b[0][0].x - conectorX) - Math.abs(a[0][0].x - conectorX));
+    const abajo = opciones[0];
+    if (!abajo) continue;
     const arriba = bs.filter(ns => !abajo.includes(ns));
     const centros = new Map<string, number>();
     let cursor = 0;
@@ -54,15 +60,24 @@ export function compactarBandasNumerosas(modelo: ModeloArbol, original: LayoutAr
       if (conectores[0] && arriba.indexOf(conectores[0]) >= arriba.length / 2) corredores.unshift(-G.separacionEntreHermanos - G.anchoNodo / 2);
       else corredores.push(ancho + G.separacionEntreHermanos + G.anchoNodo / 2);
     }
+    // Reservar una extensión continua bajo una parte de la fila, no repartir
+    // hojas a lo largo de todos los huecos de la generación.
+    const inicioCorredores = conectores[0] && bs.indexOf(conectores[0]) < bs.length / 2
+      ? corredores.length - abajo.length : 0;
+    corredores.splice(0, inicioCorredores);
+    corredores.splice(abajo.length);
     const inicioLocal = Math.min(0, ...corredores.slice(0, abajo.length).map(x => x - G.anchoNodo / 2));
     const anchoFinal = Math.max(ancho, ...corredores.slice(0, abajo.length).map(x => x + G.anchoNodo / 2)) - inicioLocal;
     centros.forEach((x, id) => centros.set(id, x - inicioLocal));
     corredores.forEach((x, i) => { corredores[i] = x - inicioLocal; });
     if (anchoFinal > (derecha - izquierda) * 0.8) continue;
     const conector = conectores[0];
+    const padres = [...new Set(ids.flatMap(id => [...modelo.padresPorHijo.get(id) ?? []]))];
+    const centroPadres = padres.length ? padres.reduce((s, id) => s + porId.get(id)!.x, 0) / padres.length
+      : (izquierda + derecha) / 2;
     const deseado = conector
       ? (Math.min(...conector.map(n => n.x)) + Math.max(...conector.map(n => n.x))) / 2 - centros.get(conector[0].grupoFamiliarId)!
-      : izquierda + ((derecha - izquierda) - anchoFinal) / 2;
+      : centroPadres - anchoFinal / 2;
     const offset = Math.max(izquierda, Math.min(derecha - anchoFinal, deseado));
     if (conector && Math.abs(offset - deseado) > 0.001) continue;
     for (const ns of arriba) {

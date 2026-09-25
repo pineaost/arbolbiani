@@ -130,7 +130,7 @@ function proyectarFila(fila: Bloque[], objetivos: number[], pesos: number[], gap
  * Todas las ascendencias participan en orden y alineación; no hay padre dueño,
  * raíz técnica, subárbol descartado ni coordenadas obtenidas del DOM.
  */
-function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArbol {
+function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number, anclarGrupos = true): LayoutArbol {
   const ordenarPorConexiones = inicio >= 4;
   if (modelo.problemas.length) throw new Error(`No se puede representar un árbol con relaciones inconsistentes: ${modelo.problemas.map(p => p.detalle).join(" ")}`);
   if (!modelo.personas.size) return { posiciones: new Map(), nodos: [], ancho: 0, alto: 0, limites: { minX: 0, minY: 0, maxX: 0, maxY: 0 }, advertencias: [], trazos: [] };
@@ -178,6 +178,11 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
     .filter(hs => hs.size > 1).map(hs => { const hsOrdenados = [...hs].sort(); return [hsOrdenados.join(":"), hsOrdenados] as const; })).values()];
   const familiasBloque = new Map(bloques.map(b => [b.id, new Set(b.personas
     .map(id => getFamiliaPrincipal(modelo.personas.get(id)!)).filter((id): id is NonNullable<typeof id> => id !== null))]));
+  const puentes = new Set(bloques.filter(b => familiasBloque.get(b.id)!.size > 1
+    && b.personas.filter(p => (modelo.padresPorHijo.get(p)?.size ?? 0) > 0).length > 1).map(b => b.id));
+  // La pareja conserva su bloque corto, pero deja de pertenecer exclusivamente
+  // a la tanda del referente. Ambas ascendencias deciden su zona de transición.
+  bloques.forEach(b => { if (anclarGrupos && puentes.has(b.id)) b.familiaOrden = `puente:${b.id}`; });
   const anchosPorBanda = new Map<string, number>();
   for (const b of bloques) for (const familia of familiasBloque.get(b.id)!) {
     const clave = `${familia}:${b.generacion}`;
@@ -205,7 +210,7 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
       // Penaliza espacio ajeno entre hermanos, no el ancho necesario para
       // alojar sus parejas. Una familia numerosa no recibe un castigo por serlo.
       return s + bs.slice(1).reduce((suma, b, i) => suma + Math.max(0,
-        b.x - bs[i].x - (b.ancho + bs[i].ancho) / 2 - gap(bs[i], b)) ** 2 * 4, 0);
+        b.x - bs[i].x - (b.ancho + bs[i].ancho) / 2 - gap(bs[i], b)) ** 2 * (anclarGrupos ? 12 : 4), 0);
     }, 0);
     const filas = new Map<number, Bloque[]>();
     locales.forEach(b => { const fila = filas.get(b.generacion) ?? []; fila.push(b); filas.set(b.generacion, fila); });
@@ -221,7 +226,14 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
       const xs: number[] = [];
       for (const f of familias) {
         const centro = media(f.progenitores.map(x));
-        if (direccion !== "hijos") for (const h of f.hijos) if (b.personas.includes(h)) xs.push(centro - dx(b, h));
+        if (direccion !== "hijos") for (const h of f.hijos) if (b.personas.includes(h)) {
+          xs.push(centro - dx(b, h));
+          const centroHijos = (Math.min(...f.hijos.map(x)) + Math.max(...f.hijos.map(x))) / 2;
+          // Trasladar la región de hermanos hacia el eje de sus padres sin
+          // atraer cada hermano al mismo punto ni borrar su separación interna.
+          const peso = !anclarGrupos ? 0 : f.progenitores.some(p => puentes.has(bloquePorPersona.get(p)!.id)) ? 5 : 3;
+          for (let i = 0; i < peso; i++) xs.push(b.x + centro - centroHijos);
+        }
         if (direccion !== "padres") {
           const propios = f.progenitores.filter(p => b.personas.includes(p));
           if (propios.length) {
@@ -241,6 +253,12 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
     const costo = () => {
       const edges = familias.flatMap(f => f.hijos.map(h => ({ f: f.id, a: media(f.progenitores.map(x)), b: x(h), desde: Math.max(...f.progenitores.map(p => generaciones.get(p)!)), hasta: generaciones.get(h)! })));
       let valor = edges.reduce((s, e) => s + (e.a - e.b) ** 2, 0) + costoHermanos();
+      if (anclarGrupos) for (const f of familias) {
+        const desvio = media(f.progenitores.map(x)) - (Math.min(...f.hijos.map(x)) + Math.max(...f.hijos.map(x))) / 2;
+        const puente = f.progenitores.some(p => puentes.has(bloquePorPersona.get(p)!.id));
+        valor += desvio ** 2 * (puente ? 12 : 6);
+        valor += Math.max(0, Math.abs(desvio) - pasoPareja * 2) ** 2 * 12;
+      }
       if (ordenarPorConexiones) for (const [a, b] of parejas) {
         if (ids.has(a)) valor += (x(a) - x(b)) ** 2;
       }
@@ -361,8 +379,10 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
         const bs = [...new Set(hs.map(h => bloquePorPersona.get(h)!))].filter(b => b.generacion === nivel).sort((a, b) => a.x - b.x);
         for (let j = 1; j < bs.length; j++) {
           const a = bs[j - 1], b = bs[j], distancia = (a.ancho + b.ancho) / 2 + gap(a, b);
-          valores[fila.indexOf(a)].push(b.x - distancia);
-          valores[fila.indexOf(b)].push(a.x + distancia);
+          for (let peso = 0; peso < (anclarGrupos ? 3 : 1); peso++) {
+            valores[fila.indexOf(a)].push(b.x - distancia);
+            valores[fila.indexOf(b)].push(a.x + distancia);
+          }
         }
       }
       proyectarFila(fila, valores.map((xs, j) => xs.length ? media(xs) : fila[j].x), valores.map(xs => Math.max(1, xs.length)), gap);
@@ -388,6 +408,13 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number): LayoutArb
 }
 
 export function calcularLayoutArbol(modelo: ModeloArbol): LayoutArbol {
+  const requiereAnclaje = modelo.familias.some(f => f.hijos.length >= GEOMETRIA_ARBOL.umbralNumeroso
+    || (f.progenitores.every(p => modelo.padresPorHijo.get(p)?.size)
+      && new Set(f.progenitores.map(p => getFamiliaPrincipal(modelo.personas.get(p)!)).filter(Boolean)).size > 1))
+    || [...modelo.conyugesPorPersona].some(([id, parejas]) => [...parejas].some(p => {
+      const a = getFamiliaPrincipal(modelo.personas.get(id)!), b = getFamiliaPrincipal(modelo.personas.get(p)!);
+      return a && b && a !== b && modelo.padresPorHijo.get(id)?.size && modelo.padresPorHijo.get(p)?.size;
+    }));
   // Distintos órdenes iniciales deterministas evitan que un matrimonio quede
   // atrapado entre ramas por el orden casual de sus ids. Se comparan relaciones
   // completas; no se elige una ascendencia que las demás deban seguir.
@@ -404,14 +431,30 @@ export function calcularLayoutArbol(modelo: ModeloArbol): LayoutArbol {
     }, 0);
     // Validez primero; luego equilibrio entre cruces, longitud, hermanos y
     // tamaño. Un único cruce no justifica separar una familia miles de píxeles.
+    const descentrado = modelo.familias.reduce((s, f) => {
+      const centro = media(f.progenitores.map(p => l.posiciones.get(p)!.x));
+      const xs = f.hijos.map(h => l.posiciones.get(h)!.x);
+      const distancia = Math.abs(centro - (Math.min(...xs) + Math.max(...xs)) / 2);
+      return s + distancia * 3 + Math.max(0, distancia - pasoPareja * 2) ** 2 / pasoPareja;
+    }, 0);
     return [g.tarjetasAtravesadas.length + g.desconectados.length + g.puertosInvalidos.length,
-      g.cruces * pasoPareja * 2 + g.longitud + dispersion * 2 + l.ancho * 0.15, g.cruces];
+      g.cruces * pasoPareja * 6 + g.longitud + dispersion * 2 + (requiereAnclaje ? descentrado : 0) + l.ancho * 0.15, g.cruces];
   };
   const menor = (a: number[], b: number[]) => {
     for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 0.001) return a[i] < b[i];
     return false;
   };
-  const candidatos = Array.from({ length: 6 }, (_, inicio) => calcularLayoutCandidato(modelo, inicio));
+  const compactados = new Set<LayoutArbol>();
+  // Conservar los órdenes de referencia evita sacrificar las ramas simples.
+  // Comparar después del plegado mide la distancia que realmente verá el usuario.
+  const candidatos = Array.from({ length: requiereAnclaje ? 12 : 6 }, (_, inicio) => {
+    const base = requiereAnclaje
+      ? calcularLayoutCandidato(modelo, inicio % 6, inicio >= 6)
+      : calcularLayoutCandidato(modelo, inicio, false);
+    const compacto = compactarBandasNumerosas(modelo, base);
+    if (compacto !== base) compactados.add(compacto);
+    return compacto;
+  });
   const distanciaMaxima = (l: LayoutArbol) => Math.max(0,
     ...modelo.familias.flatMap(f => {
       const centro = media(f.progenitores.map(p => l.posiciones.get(p)!.x));
@@ -430,8 +473,7 @@ export function calcularLayoutArbol(modelo: ModeloArbol): LayoutArbol {
     const valor = puntuar(candidato);
     if(menor(valor, costo)) { mejor=candidato; costo=valor; }
   }
-  const compacto = compactarBandasNumerosas(modelo, mejor);
-  return compacto === mejor ? flexibilizarBandas(modelo, mejor) : compacto;
+  return compactados.has(mejor) ? mejor : flexibilizarBandas(modelo, mejor);
 }
 
 /** Sólo admite un subnivel cuando elimina contactos entre vínculos sin crear

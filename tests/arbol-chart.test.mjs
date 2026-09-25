@@ -177,7 +177,8 @@ test("base actual: 121 personas y todas sus filiaciones permanecen conectadas", 
   const { modelo, layout, geometria } = comprobarArbol(ps);
   assert.equal(ps.length, 121);
   assert.ok(layout.ancho < 12000, "el ancho anterior era de 21944 px; ahora también se alinean medios hermanos");
-  assert.ok(geometria.cruces <= 8, "la disposición anterior tenía 14 contactos entre vínculos");
+  // La proximidad padre-hijo tiene prioridad sobre eliminar cada cruce.
+  assert.ok(geometria.cruces <= 14, `no superar los 14 contactos históricos; ahora: ${geometria.cruces}`);
   for (const f of modelo.familias) {
     if (f.progenitores.length === 2) {
       const [a,b] = f.progenitores.map(id => layout.posiciones.get(id));
@@ -320,6 +321,11 @@ for (const cantidad of [4, 8, 10, 11]) test(`${cantidad} hermanos: plegado acota
     assert.equal(ys[1] - ys[0], GEOMETRIA_ARBOL.subnivelNumeroso);
     assert.ok(Math.max(...hs.map(n => n.x)) - Math.min(...hs.map(n => n.x)) + 176 < cantidad * 216 * 0.8);
     assert.equal(new Set(hs.map(n => n.generacion)).size, 1);
+    const secundarios = hs.filter(n => n.y === ys[1]);
+    assert.ok(secundarios.length < hs.length / 2, "la mayoría permanece en la fila principal");
+    const orden = [...hs].sort((a, b) => a.id.localeCompare(b.id));
+    const indices = secundarios.map(n => orden.indexOf(n)).sort((a, b) => a - b);
+    assert.equal(indices.at(-1) - indices[0] + 1, indices.length, "se pliega un subgrupo continuo, no hermanos alternados");
     assert.ok(ys[0] - r.layout.posiciones.get("raiz").y >= GEOMETRIA_ARBOL.separacionVertical);
   }
   assert.deepEqual(calcularLayoutArbol(crearModeloArbol([...ps].reverse())).nodos, r.layout.nodos);
@@ -331,6 +337,22 @@ test("las bifurcaciones interiores se curvan y distinguen tronco, rama y termina
   assert.ok(partes.some(p => p.jerarquia === "tronco"));
   assert.ok(partes.some(p => p.jerarquia === "rama" && p.d.includes(" Q")));
   assert.ok(partes.some(p => p.jerarquia === "terminal" && p.d.includes(" Q")));
+});
+
+test("una pareja puente conserva ambas ascendencias y centra su bloque de hijos", () => {
+  const ps = [miembro("raiz-a", "Biani"), miembro("raiz-b", "Acevey"),
+    ...["a0", "a1", "a2"].map(id => miembro(id, "Biani", { padres: ["raiz-a"] })),
+    ...["b0", "b1", "b2"].map(id => miembro(id, "Acevey", { padres: ["raiz-b"] })),
+    ...["h0", "h1", "h2"].map(id => miembro(id, "Biani", { padres: ["a1", "b1"] }))];
+  const { layout } = comprobarArbol(ps), p = id => layout.posiciones.get(id);
+  assert.equal(Math.abs(p("a1").x - p("b1").x), 196);
+  const centro = (p("a1").x + p("b1").x) / 2;
+  const hijos = ["h0", "h1", "h2"].map(id => p(id).x);
+  assert.ok(Math.abs((Math.min(...hijos) + Math.max(...hijos)) / 2 - centro) < 40);
+  assert.equal(new Set(["h0", "h1", "h2"].map(id => p(id).y)).size, 1);
+  for (const [id, hermanos] of [["a1", ["a0", "a2"]], ["b1", ["b0", "b2"]]]) {
+    assert.ok(hermanos.every(h => Math.abs(p(h).x - p(id).x) <= 3 * 216));
+  }
 });
 
 test("una madre aún no registrada no separa a los hermanos de generación", () => {
@@ -392,9 +414,16 @@ test("revisión final: Remigio y Esther se distinguen sin desplazar sus fichas n
   const hermanosNumerosos = numerosa.hijos.map(id => r.layout.posiciones.get(id));
   assert.equal(new Set(hermanosNumerosos.map(n => n.y)).size, 2,
     "la familia más numerosa debe plegarse incluso con su pareja conectora en el extremo derecho");
-  assert.ok(Math.max(...hermanosNumerosos.map(n => n.x)) - Math.min(...hermanosNumerosos.map(n => n.x)) + 176 <= 1800);
-  assert.ok(Math.abs(r.layout.posiciones.get(esther.id).x - r.layout.posiciones.get(bruno.id).x) <= 600,
-    "el matrimonio no debe dejar al hermano al otro lado de una familia numerosa (antes: 2632 px)");
+  assert.ok(Math.max(...hermanosNumerosos.map(n => n.x)) - Math.min(...hermanosNumerosos.map(n => n.x)) + 176
+    <= numerosa.hijos.length * 216 * 0.65, "la mayoría alineada todavía ahorra al menos 35% del ancho de una sola fila");
+  assert.ok(Math.abs(r.layout.posiciones.get(esther.id).x - r.layout.posiciones.get(bruno.id).x) <= 4 * 216,
+    "la zona de transición admite hasta cuatro pasos entre hermanos con ramas propias (antes: 2632 px)");
+  const distancias = r.modelo.familias.flatMap(f => {
+    const centro = f.progenitores.reduce((s, id) => s + r.layout.posiciones.get(id).x, 0) / f.progenitores.length;
+    return f.hijos.map(id => Math.abs(r.layout.posiciones.get(id).x - centro));
+  });
+  assert.ok(Math.max(...distancias) < 1600, "reducir el máximo anterior de 1842 px");
+  assert.ok(distancias.reduce((a,b) => a+b,0) / distancias.length < 450, "reducir la media anterior de 532 px");
   for (const generacion of new Set(r.layout.nodos.map(n => n.generacion))) {
     const ys = r.layout.nodos.filter(n => n.generacion === generacion).map(n => n.y);
     assert.ok(Math.max(...ys) - Math.min(...ys) <= GEOMETRIA_ARBOL.subnivelNumeroso);
