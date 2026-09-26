@@ -22,6 +22,10 @@ export function compactarBandasNumerosas(modelo: ModeloArbol, original: LayoutAr
     const bs = [...new Set(hs.map(n => n.grupoFamiliarId))].map(id => bloques.get(id)!)
       .sort((a, b) => a[0].x - b[0].x);
     const propios = new Set(bs.flatMap(ns => ns.map(n => n.id)));
+    // Las familias enlazadas por una pareja con ascendencia propia conservan
+    // una única fila. Plegarlas según cuántos hermanos sean hojas cambia su
+    // orden y desplaza las ramas vecinas al registrar un nuevo descendiente.
+    if (bs.some(ns => ns.some(n => !ids.includes(n.id) && (modelo.padresPorHijo.get(n.id)?.size ?? 0) > 0))) continue;
     const izquierda = Math.min(...bs.flatMap(ns => ns.map(n => n.x))) - G.anchoNodo / 2;
     const derecha = Math.max(...bs.flatMap(ns => ns.map(n => n.x))) + G.anchoNodo / 2;
     if (nodos.some(n => n.generacion === generacion && !propios.has(n.id) && n.x > izquierda && n.x < derecha)) continue;

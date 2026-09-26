@@ -81,3 +81,5 @@ variables de entorno que en `.env.local`, y cada push a `main` despliega.
 `npm test` comprueba el modelo, las posiciones y la continuidad geométrica sobre casos de regresión y copias de los datos reales. `npm run audit:arbol` genera el diagnóstico y una vista SVG reproducibles en `Referencias/revision-layout/actual.*`; se puede indicar otra copia de personas mediante `ARBOL_DATOS`.
 
 La [revisión del sistema de árbol](Referencias/revision-layout/REVISION.md) documenta el algoritmo y las comprobaciones. La única fuente de posiciones y trazos es `calcularLayoutArbol`; la interfaz consume ese resultado sin recolocar fichas.
+
+La [revisión de organización y crecimiento](Referencias/revision-layout/ORGANIZACION-Y-CRECIMIENTO.md) describe las restricciones de hermandad, los matrimonios entre ramas y la separación de núcleos cuando aparecen nuevos descendientes, con pruebas del caso Podrecca/Biani.

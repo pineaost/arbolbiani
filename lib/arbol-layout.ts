@@ -4,6 +4,7 @@ import { claveOrden, crearVinculosVisualesArbol } from "./arbol-modelo";
 import { espacioEntreFilasArbol, crearTrazosVinculosArbol, diagnosticarGeometriaArbol } from "./arbol-vinculos";
 import { getFamiliaPrincipal } from "./familias";
 import { compactarBandasNumerosas } from "./arbol-bandas";
+import { ordenarGruposConsecutivos } from "./arbol-orden";
 
 class Grupos {
   private representantes = new Map<string, string>();
@@ -73,7 +74,13 @@ function ordenarGeneraciones(modelo: ModeloArbol) {
   // para encontrarse con otra larga, sin inventar niveles por fechas faltantes.
   for (const id of [...dag.orden].reverse()) {
     const hijos = [...dag.salidas.get(id)!];
-    if (hijos.length) niveles.set(id, Math.min(...hijos.map(h => niveles.get(h)! - 1)));
+    // La rama más profunda fija la alineación: una rama corta nueva no tira
+    // hacia arriba ascendencias consolidadas. La pasada descendente siguiente
+    // extiende las ramas cortas y conserva incluso filiaciones que saltan filas.
+    if (hijos.length) niveles.set(id, Math.max(...hijos.map(h => niveles.get(h)! - 1)));
+  }
+  for (const id of dag.orden) for (const hijo of dag.salidas.get(id)!) {
+    niveles.set(hijo, Math.max(niveles.get(hijo)!, niveles.get(id)! + 1));
   }
   const anio = (id: string) => {
     const valor = Number(modelo.personas.get(id)!.fecha_nacimiento?.slice(0, 4));
@@ -84,7 +91,7 @@ function ordenarGeneraciones(modelo: ModeloArbol) {
   const generaciones = new Map<string, number>();
   for (const componente of modelo.componentes) {
     const minimo = Math.min(...componente.ids.map(id => niveles.get(cohortes.raiz(id))!));
-    const estimaciones = componente.ids.filter(id => anio(id) !== null)
+    const estimaciones = componente.raicesAncestrales.filter(id => anio(id) !== null)
       .map(id => (anio(id)! - base) / 28 - (niveles.get(cohortes.raiz(id))! - minimo)).sort((a, b) => a - b);
     const offset = estimaciones.length ? Math.max(0, Math.round(estimaciones[Math.floor(estimaciones.length / 2)])) : 0;
     for (const id of componente.ids) generaciones.set(id, niveles.get(cohortes.raiz(id))! - minimo + offset);
@@ -370,6 +377,48 @@ function calcularLayoutCandidato(modelo: ModeloArbol, inicio: number, anclarGrup
       }
       if (!cambio) break;
     }
+    // Cerrar el orden antes de ajustar distancias. Una mejora métrica posterior
+    // no puede insertar otra rama entre hermanos, ni usar el matrimonio como
+    // excusa para apropiarse de la hermandad del otro cónyuge.
+    for (const nivel of niveles) {
+      const fila = filas.get(nivel)!;
+      const grupos = hermanos.map(hs => [...new Set(hs.map(h => bloquePorPersona.get(h)!))]);
+      const centroOrigen = (b: Bloque) => {
+        const padres = [...new Set(b.personas.flatMap(p => [...modelo.padresPorHijo.get(p) ?? []]))];
+        return padres.length ? media(padres.map(x)) : b.x;
+      };
+      fila.sort((a, b) => centroOrigen(a) - centroOrigen(b) || comparar(a.referente, b.referente));
+      const tandas = new Map<string, Bloque[]>();
+      for (const b of fila) tandas.set(b.familiaOrden, [...tandas.get(b.familiaOrden) ?? [], b]);
+      tandas.forEach(bs => bs.sort((a, b) => comparar(a.referente, b.referente)));
+      const preferida = fila.map(b => tandas.get(b.familiaOrden)!.shift()!);
+      const orden = ordenarGruposConsecutivos(preferida, grupos,
+        (a, b) => Number(centroOrigen(a) > centroOrigen(b) + 0.001));
+      // Sólo las conexiones con otra ascendencia justifican alterar la
+      // cronología. Tener un hijo nuevo no cambia el lugar de un hermano.
+      const interiores = new Map<string, Bloque[]>();
+      for (const b of orden) {
+        const origenes = new Set(b.personas.map(p => origen.get(p)).filter(Boolean));
+        if (origenes.size > 1) continue;
+        interiores.set(b.familia, [...interiores.get(b.familia) ?? [], b]);
+      }
+      for (const bs of interiores.values()) {
+        const indices = bs.map(b => orden.indexOf(b));
+        bs.sort((a, b) => comparar(a.referente, b.referente));
+        indices.forEach((indice, i) => { orden[indice] = bs[i]; });
+      }
+      proyectarFila(orden, orden.map(b => b.x), orden.map(() => 1), gap);
+      filas.set(nivel, orden);
+      for (const b of orden) if (b.personas.length === 2) {
+        const costoOrientacion = () => hermanos.reduce((s, hs) => {
+          const propios = hs.filter(h => b.personas.includes(h));
+          const externos = hs.filter(h => !b.personas.includes(h));
+          return s + propios.reduce((v, h) => v + externos.reduce((n, p) => n + Math.abs(x(h) - x(p)), 0), 0);
+        }, 0);
+        const anterior = costoOrientacion(); b.personas.reverse();
+        if (costoOrientacion() >= anterior) b.personas.reverse();
+      }
+    }
     for (let i = 0; i < 40; i++) for (const nivel of i % 2 ? niveles : [...niveles].reverse()) {
       const fila = filas.get(nivel)!;
       const valores = fila.map(b => objetivos(b, "todos"));
@@ -437,7 +486,7 @@ export function calcularLayoutArbol(modelo: ModeloArbol): LayoutArbol {
       const distancia = Math.abs(centro - (Math.min(...xs) + Math.max(...xs)) / 2);
       return s + distancia * 3 + Math.max(0, distancia - pasoPareja * 2) ** 2 / pasoPareja;
     }, 0);
-    return [g.tarjetasAtravesadas.length + g.desconectados.length + g.puertosInvalidos.length,
+    return [g.tarjetasAtravesadas.length + g.desconectados.length + g.puertosInvalidos.length, g.solapamientos.length,
       g.cruces * pasoPareja * 6 + g.longitud + dispersion * 2 + (requiereAnclaje ? descentrado : 0) + l.ancho * 0.15, g.cruces];
   };
   const menor = (a: number[], b: number[]) => {
@@ -473,7 +522,62 @@ export function calcularLayoutArbol(modelo: ModeloArbol): LayoutArbol {
     const valor = puntuar(candidato);
     if(menor(valor, costo)) { mejor=candidato; costo=valor; }
   }
-  return compactados.has(mejor) ? mejor : flexibilizarBandas(modelo, mejor);
+  return separarNucleosEnConflicto(modelo, compactados.has(mejor) ? mejor : flexibilizarBandas(modelo, mejor));
+}
+
+/** El orden de familias puede exigir otra subfila cuando hay matrimonios en
+ * generaciones consecutivas. Se amplía la altura antes de romper hermandades:
+ * se mueve el núcleo completo, con sus parejas, y se da aire a sus descendientes.
+ * Cada propuesta se acepta sólo si mejora los cruces y toda la geometría es válida.
+ */
+function separarNucleosEnConflicto(modelo: ModeloArbol, original: LayoutArbol): LayoutArbol {
+  const comoNodos = (ns: PosicionPersonaArbol[]) => ns.map(n => ({ data: { id: n.id }, x: n.x, y: n.y }));
+  let layout = original;
+  let diagnostico = diagnosticarGeometriaArbol(layout.trazos, comoNodos(layout.nodos));
+  if (!diagnostico.cruces) return layout;
+  const grupos = new Grupos(modelo.personas.keys());
+  const unirMismaGeneracion = (ids: string[]) => {
+    const porNivel = new Map<number, string[]>();
+    for (const id of ids) {
+      const nivel = layout.posiciones.get(id)!.generacion;
+      porNivel.set(nivel, [...porNivel.get(nivel) ?? [], id]);
+    }
+    for (const ps of porNivel.values()) for (const p of ps.slice(1)) grupos.unir(ps[0], p);
+  };
+  modelo.hijosPorPadre.forEach(hs => unirMismaGeneracion([...hs]));
+  const parejas = new Map<string, string[]>();
+  layout.nodos.forEach(n => parejas.set(n.grupoFamiliarId, [...parejas.get(n.grupoFamiliarId) ?? [], n.id]));
+  parejas.forEach(unirMismaGeneracion);
+  const movidos = new Set<string>();
+  for (let vuelta = 0; vuelta < 3 && diagnostico.cruces; vuelta++) {
+    const conflictos = new Set(diagnostico.relacionesCruzadas);
+    const candidatos = [...new Set(layout.trazos.filter(t => conflictos.has(t.vinculo.id))
+      .flatMap(t => t.vinculo.tipo === "union-familiar" ? t.vinculo.hijosIds.map(h => grupos.raiz(h)) : []))]
+      .filter(id => !movidos.has(id)).sort();
+    let elegido: { id: string; layout: LayoutArbol; diagnostico: typeof diagnostico } | undefined;
+    const vinculos = crearVinculosVisualesArbol(modelo);
+    const delta = Math.max(GEOMETRIA_ARBOL.separacionVertical,
+      ...espacioEntreFilasArbol(vinculos, comoNodos(layout.nodos)).values());
+    for (const id of candidatos) {
+      const { generacion, componenteIndice } = layout.posiciones.get(id)!;
+      const nodos = layout.nodos.map(n => ({ ...n, y: n.y + (n.componenteIndice === componenteIndice
+        && (n.generacion > generacion || grupos.raiz(n.id) === id) ? delta : 0) }));
+      const trazos = crearTrazosVinculosArbol(vinculos, comoNodos(nodos));
+      const d = diagnosticarGeometriaArbol(trazos, comoNodos(nodos));
+      if (d.cruces >= (elegido?.diagnostico.cruces ?? diagnostico.cruces) || d.solapamientos.length > diagnostico.solapamientos.length
+        || d.tarjetasAtravesadas.length || d.desconectados.length || d.puertosInvalidos.length
+        || d.extremosLibres.length || d.sinTrazo.length || d.noFinitos.length) continue;
+      const puntos = trazos.flatMap(t => t.trazo?.segmentos.flatMap(s => [s.inicio, s.fin]) ?? []);
+      if (puntos.some(p => p.x < 0 || p.x > layout.ancho || p.y < 0)) continue;
+      const alto = Math.max(...nodos.map(n => n.y + GEOMETRIA_ARBOL.altoNodo / 2), ...puntos.map(p => p.y)) + GEOMETRIA_ARBOL.margenMapa;
+      nodos.sort((a, b) => a.componenteIndice - b.componenteIndice || a.y - b.y || a.x - b.x || a.id.localeCompare(b.id));
+      elegido = { id, diagnostico: d, layout: { ...layout, nodos, posiciones: new Map(nodos.map(n => [n.id, n])), trazos, alto,
+        limites: { ...layout.limites, maxY: alto } } };
+    }
+    if (!elegido) break;
+    movidos.add(elegido.id); layout = elegido.layout; diagnostico = elegido.diagnostico;
+  }
+  return layout;
 }
 
 /** Sólo admite un subnivel cuando elimina contactos entre vínculos sin crear

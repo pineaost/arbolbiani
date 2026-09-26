@@ -443,6 +443,97 @@ test("los marcos no sugieren parejas exclusivas cuando hay varios cónyuges", ()
   assert.deepEqual(crearMarcosParejaArbol(r.modelo,r.layout),[]);
 });
 
+let referenciaBiani;
+function casoBiani() {
+  if (!referenciaBiani) {
+    const personas = JSON.parse(readFileSync(resolve(raiz, "Referencias/revision-layout/personas-revision-final.json"), "utf8"));
+    const r = comprobarArbol(personas);
+    const juan = personas.find(p => p.nombre === "Juan Valentín" && p.apellido === "Biani");
+    const hermanos = [...r.modelo.hijosPorPadre.get(juan.id)];
+    const buscar = nombre => personas.find(p => p.nombre === nombre).id;
+    referenciaBiani = { personas, ...r, hermanos, remigio: buscar("Remigio Lorenzo"), esther: buscar("Esther Iris"), bruno: buscar("Bruno") };
+  }
+  return referenciaBiani;
+}
+
+function comprobarFronteraBiani(layout) {
+  const { hermanos, remigio, esther, bruno } = casoBiani();
+  const p = id => layout.posiciones.get(id);
+  const fila = layout.nodos.filter(n => n.generacion === p(remigio).generacion).sort((a, b) => a.x - b.x);
+  const indices = hermanos.map(id => fila.findIndex(n => n.id === id));
+  assert.equal(Math.max(...indices) - Math.min(...indices) + 1, 10, "ninguna persona ajena se inserta entre los diez hermanos");
+  assert.equal(new Set(hermanos.map(id => p(id).y)).size, 1, "el matrimonio entre ramas mantiene una fila estable al crecer");
+  assert.equal(p(remigio).x, Math.min(...hermanos.map(id => p(id).x)), "Remigio mira a la rama Podrecca de la izquierda");
+  assert.ok(p(bruno).x < p(esther).x && p(esther).x < p(remigio).x);
+  assert.ok(p(esther).x - p(bruno).x <= 256.001, "Bruno y Esther permanecen adyacentes");
+  assert.ok(Math.abs(p(remigio).x - p(esther).x - 196) < 0.001, "la unión entre familias ocupa sólo el espacio de una pareja");
+}
+
+test("Podrecca y los diez Biani ocupan regiones consecutivas con una unión corta en la frontera", () => {
+  const r = casoBiani();
+  comprobarFronteraBiani(r.layout);
+  assert.equal(r.geometria.cruces, 0);
+  assert.deepEqual(r.geometria.solapamientos, []);
+});
+
+for (const nombres of [["Agustín Alberto", "Eduardo Mariano"], ["Isabel Emilia", "María Luisa"], ["José Valentín", "Ricardo Alfredo"]]) {
+  test(`agregar hijos a ${nombres.join(" y ")} conserva las familias y las generaciones existentes`, () => {
+    const base = casoBiani();
+    const ps = structuredClone(base.personas);
+    nombres.forEach((nombre, i) => ps.push(persona(`descendiente-prueba-${i}`, {
+      padres: [ps.find(p => p.nombre === nombre).id], nacimiento: "1950-01-01",
+    })));
+    const r = comprobarArbol(ps);
+    comprobarFronteraBiani(r.layout);
+    const orden = l => [...base.hermanos].sort((a, b) => l.posiciones.get(a).x - l.posiciones.get(b).x);
+    assert.deepEqual(orden(r.layout), orden(base.layout), "tener hijos no permuta hermanos");
+    for (const n of base.layout.nodos) assert.equal(r.layout.posiciones.get(n.id).generacion, n.generacion, "una hoja nueva no cambia las generaciones existentes");
+    for (const id of base.hermanos) assert.ok(Math.abs(r.layout.posiciones.get(id).x - base.layout.posiciones.get(id).x) < 216, "no desplazar innecesariamente la rama consolidada");
+    assert.deepEqual(r.geometria.solapamientos, []);
+    assert.equal(r.geometria.cruces, 0, "separar núcleos verticalmente antes de forzar cruces entre matrimonios");
+  });
+}
+
+test("el orden de carriles elimina cruces evitables cuando dos familias se desplazan hacia el mismo lado", () => {
+  const nodos = [
+    { data: { id: "p" }, x: 0, y: 0 }, { data: { id: "q" }, x: 200, y: 0 },
+    { data: { id: "a" }, x: 400, y: 300 }, { data: { id: "b" }, x: 600, y: 300 },
+  ];
+  const vs = [["p", "a"], ["q", "b"]].map(([p, h]) => ({ id: p, familiaId: p, tipo: "union-familiar", progenitoresIds: [p], hijosIds: [h] }));
+  const trazos = crearTrazosVinculosArbol(vs, nodos);
+  assert.equal(comprobarGeometria(trazos, nodos).cruces, 0);
+  assert.deepEqual(diagnosticarGeometriaArbol(trazos, nodos).solapamientos, []);
+  assert.deepEqual(crearTrazosVinculosArbol([...vs].reverse(), [...nodos].reverse()).reverse(), trazos);
+});
+
+test("nuevos cónyuges, hermanos y nietos conservan ambas hermandades sin depender de apellidos conocidos", () => {
+  const ps = [persona("raiz-a"), persona("raiz-b"),
+    ...Array.from({ length: 10 }, (_, i) => persona(`hermano-${i}`, { padres: ["raiz-a"] })),
+    persona("puente", { padres: ["raiz-b"], conyuges: ["hermano-3"] }),
+    persona("otro-hermano", { padres: ["raiz-b"] }),
+    persona("hijo-puente", { padres: ["hermano-3", "puente"] }),
+    persona("nieto-puente", { padres: ["hijo-puente"] }),
+  ];
+  const inicial = comprobarArbol(ps);
+  for (const nuevas of [
+    [persona("hijo-4", { padres: ["hermano-4"] }), persona("hijo-7", { padres: ["hermano-7"] })],
+    [persona("pareja-4", { conyuges: ["hijo-4"] }), persona("otro-hijo-7", { padres: ["hermano-7"] })],
+    [persona("nieto-4", { padres: ["hijo-4", "pareja-4"] }), persona("nieto-7", { padres: ["hijo-7"] })],
+  ]) {
+    ps.push(...nuevas);
+    const r = comprobarArbol(ps);
+    for (const n of inicial.layout.nodos) assert.equal(r.layout.posiciones.get(n.id).generacion, n.generacion);
+    for (const raiz of ["raiz-a", "raiz-b"]) {
+      const grupos = new Set([...r.modelo.hijosPorPadre.get(raiz)].map(id => r.layout.posiciones.get(id).grupoFamiliarId));
+      const hs = r.layout.nodos.filter(n => grupos.has(n.grupoFamiliarId));
+      const min = Math.min(...hs.map(n => n.x)), max = Math.max(...hs.map(n => n.x));
+      assert.ok(r.layout.nodos.filter(n => n.generacion === hs[0].generacion && n.x >= min && n.x <= max)
+        .every(n => grupos.has(n.grupoFamiliarId)), "no intercalar otra familia al ampliar una rama");
+    }
+    assert.deepEqual(r.geometria.solapamientos, []);
+  }
+});
+
 test("la jerarquía visual conserva exactamente los mismos tramos y puertos", () => {
   const r = comprobarArbol(datosReales());
   for(const {trazo} of r.trazos) {

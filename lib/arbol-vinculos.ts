@@ -166,10 +166,37 @@ function planificar(vinculos: VinculoVisualArbol[], nodos: NodoPosicionadoArbol[
   // Coloración de intervalos: familias cuyo recorrido horizontal coincide
   // reciben carriles diferentes. El mismo plan determina el espacio vertical.
   const ocupados = new Map<number, PlanUnion[][]>();
-  for (const plan of planes.sort((a, b) => a.nivel - b.nivel || a.minX - b.minX || a.maxX - b.maxX || a.vinculo.id.localeCompare(b.vinculo.id))) {
+  const anclaX = (p: PlanUnion) => (p.padres[0].x + p.padres[p.padres.length - 1].x) / 2;
+  const dentroBus = (p: PlanUnion, x: number) => x >= Math.min(anclaX(p), ...p.hijos.map(h => h.x)) - EPS
+    && x <= Math.max(anclaX(p), ...p.hijos.map(h => h.x)) + EPS;
+  // Si A está arriba de B, el tronco de B y las bajadas de A pueden
+  // atravesar el otro bus. Elegir primero el orden de los carriles evita
+  // cruces que ninguna separación vertical por sí sola podría resolver.
+  const contactos = (a: PlanUnion, b: PlanUnion) => !a.hijos.length || !b.hijos.length ? 0
+    : Number(dentroBus(a, anclaX(b))) + a.hijos.filter(h => dentroBus(b, h.x)).length;
+  const porNivel = new Map<number, PlanUnion[]>();
+  for (const p of planes) porNivel.set(p.nivel, [...porNivel.get(p.nivel) ?? [], p]);
+  const ordenados = [...porNivel].sort(([a], [b]) => a - b).flatMap(([, ps]) => {
+    ps.sort((a, b) => a.minX - b.minX || a.maxX - b.maxX || a.vinculo.id.localeCompare(b.vinculo.id));
+    for (let vuelta = 0; vuelta < ps.length; vuelta++) {
+      let cambio = false;
+      for (let i = 1; i < ps.length; i++) {
+        let diferencia = 0, mejor = 0, destino = i;
+        for (let j = i - 1; j >= 0; j--) {
+          diferencia += contactos(ps[i], ps[j]) - contactos(ps[j], ps[i]);
+          if (diferencia < mejor) { mejor = diferencia; destino = j; }
+        }
+        if (destino !== i) { ps.splice(destino, 0, ps.splice(i, 1)[0]); cambio = true; }
+      }
+      if (!cambio) break;
+    }
+    return ps;
+  });
+  for (const plan of ordenados) {
     const carriles = ocupados.get(plan.nivel) ?? [];
-    let c = carriles.findIndex(ps => ps.every(p => plan.minX > p.maxX + 8 || plan.maxX < p.minX - 8));
-    if (c < 0) { c = carriles.length; carriles.push([]); }
+    const superpuestos = carriles.flat().filter(p => plan.minX <= p.maxX + 8 && plan.maxX >= p.minX - 8);
+    const c = Math.max(-1, ...superpuestos.map(p => p.carril)) + 1;
+    while (carriles.length <= c) carriles.push([]);
     carriles[c].push(plan); plan.carril = c; ocupados.set(plan.nivel, carriles);
   }
   return { planes, ocupados };
@@ -212,11 +239,17 @@ export function crearTrazosVinculosArbol(vinculos: VinculoVisualArbol[], nodosEn
       agregar("union", ruta({ x: Math.min(...ps.map(p => p.x)), y: puenteY }, { x: Math.max(...ps.map(p => p.x)), y: puenteY }, nodos));
     }
     if (hijos.length) {
-      const minimoBus = plan.nivel + H + 24 + cantidad * GEOMETRIA_ARBOL.separacionCarriles + plan.carril * GEOMETRIA_ARBOL.separacionCarriles;
+      const primeraLlegada = Math.min(...hijos.map(n => n.y));
+      // Si otro núcleo ocupa una subfila anterior, distribuir esta familia
+      // debajo de él. El router rodea las tarjetas al llevar el tronco hasta
+      // ese corredor; sus bajadas no atraviesan los buses de la subfila anterior.
+      const nivelBus = Math.max(plan.nivel, ...nodos.filter(n => n.y > plan.nivel + GEOMETRIA_ARBOL.subnivelNumeroso
+        && n.y + H * 2 + 40 + cantidad * GEOMETRIA_ARBOL.separacionCarriles * 2 <= primeraLlegada + EPS).map(n => n.y));
+      const minimoBus = nivelBus + H + 24 + cantidad * GEOMETRIA_ARBOL.separacionCarriles + plan.carril * GEOMETRIA_ARBOL.separacionCarriles;
       // El aire adicional se reparte antes y después del distribuidor.
       const siguienteBanda = Math.min(...hijos.map(n => n.y - H), ...nodos
-        .filter(n => n.y > plan.nivel + GEOMETRIA_ARBOL.desnivelMaximo * 2).map(n => n.y - H));
-      const disponible = siguienteBanda - (plan.nivel + H + 24 + cantidad * GEOMETRIA_ARBOL.separacionCarriles * 2);
+        .filter(n => n.y > nivelBus + GEOMETRIA_ARBOL.desnivelMaximo * 2).map(n => n.y - H));
+      const disponible = siguienteBanda - (nivelBus + H + 24 + cantidad * GEOMETRIA_ARBOL.separacionCarriles * 2);
       const yBus = minimoBus + Math.max(0, disponible) * 0.35;
       const destino = hijos.map(n => ({ personaId: n.data.id, x: n.x, y: n.y - H }));
       puertos.push(...destino);
@@ -295,6 +328,8 @@ function seTocan(a: SegmentoArbol, b: SegmentoArbol) {
 /** Comprueba geometría real, además de la cobertura lógica de ids. */
 export function diagnosticarGeometriaArbol(trazos: TrazoCalculadoArbol[], nodos: NodoPosicionadoArbol[]) {
   const sinTrazo: string[] = [], desconectados: string[] = [], extremosLibres: string[] = [], puertosInvalidos: string[] = [], tarjetasAtravesadas: string[] = [], noFinitos: string[] = [];
+  const solapamientos = new Set<string>();
+  const relacionesCruzadas = new Set<string>();
   let cruces = 0, longitud = 0;
   for (const { vinculo, trazo } of trazos) {
     if (!trazo || !trazo.segmentos.length) { sinTrazo.push(vinculo.id); continue; }
@@ -315,7 +350,21 @@ export function diagnosticarGeometriaArbol(trazos: TrazoCalculadoArbol[], nodos:
     });
   }
   for (let i = 0; i < trazos.length; i++) for (let j = i + 1; j < trazos.length; j++) {
-    for (const a of trazos[i].trazo?.segmentos ?? []) for (const b of trazos[j].trazo?.segmentos ?? []) if (seTocan(a, b)) cruces++;
+    for (const a of trazos[i].trazo?.segmentos ?? []) for (const b of trazos[j].trazo?.segmentos ?? []) {
+      if (seTocan(a, b)) {
+        cruces++;
+        relacionesCruzadas.add(trazos[i].vinculo.id); relacionesCruzadas.add(trazos[j].vinculo.id);
+      }
+      const vertical = Math.abs(a.inicio.x - a.fin.x) < EPS && Math.abs(b.inicio.x - b.fin.x) < EPS
+        && Math.abs(a.inicio.x - b.inicio.x) < EPS;
+      const horizontal = Math.abs(a.inicio.y - a.fin.y) < EPS && Math.abs(b.inicio.y - b.fin.y) < EPS
+        && Math.abs(a.inicio.y - b.inicio.y) < EPS;
+      if (!vertical && !horizontal) continue;
+      const eje = vertical ? "y" : "x";
+      const longitudComun = Math.min(Math.max(a.inicio[eje], a.fin[eje]), Math.max(b.inicio[eje], b.fin[eje]))
+        - Math.max(Math.min(a.inicio[eje], a.fin[eje]), Math.min(b.inicio[eje], b.fin[eje]));
+      if (longitudComun > EPS) solapamientos.add(`${trazos[i].vinculo.id} / ${trazos[j].vinculo.id}`);
+    }
   }
-  return { sinTrazo, desconectados, extremosLibres: [...new Set(extremosLibres)], puertosInvalidos, tarjetasAtravesadas: [...new Set(tarjetasAtravesadas)], noFinitos, cruces, longitud: Math.round(longitud) };
+  return { sinTrazo, desconectados, extremosLibres: [...new Set(extremosLibres)], puertosInvalidos, tarjetasAtravesadas: [...new Set(tarjetasAtravesadas)], noFinitos, solapamientos: [...solapamientos], relacionesCruzadas: [...relacionesCruzadas], cruces, longitud: Math.round(longitud) };
 }
